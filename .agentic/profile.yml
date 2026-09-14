@@ -1,0 +1,72 @@
+# The canary's profile. Everything the loop does here is projected from this file.
+#
+# A branch chain on purpose: `trunk` is the shape this loop has run in production for
+# months, and the chain is the one nothing has ever executed. Work is cut from `main`,
+# opens against `dev`, and is promoted dev → test → main, closing its issue at `main`.
+version: 1
+name: agentic-loop-canary
+
+runners:
+  agent: [ubuntu-latest]
+  slim: [ubuntu-latest]
+  ci: [ubuntu-latest]
+
+# The model the agents run on. Change provider, baseUrl and model to match whichever key
+# is set as MODEL_API_KEY; the secret name is what the workflows read, and only the name
+# appears in an installed file.
+llm:
+  provider: forge
+  baseUrl: https://forge.plainconcepts.com/v1
+  model: glm-5-3
+  secret: MODEL_API_KEY
+
+# The App this loop acts as. `appLogin` must be the App's own bot login, which GitHub
+# derives from the App's name: an App named "Agentic Loop Canary" logs in as
+# `agentic-loop-canary[bot]`.
+bot:
+  appLogin: agentic-loop-canary[bot]
+  appIdSecret: BOT_APP_ID
+  keySecret: BOT_PRIVATE_KEY
+
+# Neither is needed to prove the chain, and each is a host to reach and a secret to hold.
+memory:
+  enabled: false
+codegraph:
+  enabled: false
+
+stack: [go]
+projects:
+  - path: .
+    stack: go
+    label: app
+    verify: go build ./... && go test ./...
+
+branching:
+  strategy: branch-chain
+  cutFrom: main
+  chain: [dev, test, main]
+  mergeMethod: rebase
+  closeIssueOn: main
+  branchNaming: agent/{issue}-{run}
+  # Short, because a canary that soaked for a day would prove one promotion a day.
+  soak:
+    test: 5m
+    main: 5m
+  changelogOn: [main]
+
+changelog:
+  path: CHANGELOG.json
+
+ci:
+  template: app-ci-go
+  workflowName: CI
+
+release:
+  versionSource: git-tag
+
+audit:
+  cronSlot: 4
+
+constitution:
+  entry: AGENTS.md
+  docs: [ARCHITECTURE.md]

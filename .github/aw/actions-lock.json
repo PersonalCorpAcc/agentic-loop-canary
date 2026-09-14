@@ -1,0 +1,14 @@
+{
+  "entries": {
+    "actions/setup-dotnet@v5": {
+      "repo": "actions/setup-dotnet",
+      "version": "v5",
+      "sha": "26b0ec14cb23fa6904739307f278c14f94c95bf1"
+    },
+    "github/gh-aw-actions/setup@v0.87.5": {
+      "repo": "github/gh-aw-actions/setup",
+      "version": "v0.87.5",
+      "sha": "2a78d04403fdc6907d0f05327cffac9dbad5312d"
+    }
+  }
+}

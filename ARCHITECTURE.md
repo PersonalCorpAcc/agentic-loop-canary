@@ -1,0 +1,3 @@
+# Architecture
+
+One Go module.
