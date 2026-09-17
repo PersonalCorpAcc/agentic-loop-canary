@@ -99,10 +99,7 @@ branching:
   # `risk-based` is in the schema and refused at projection (T134): the choice today is
   # `off` or `always`.
   autoMerge:
-    # Back to the shipped default while T214 checks it. The merge/approve wording moved out of
-    # the prompt and into job outputs at T210, and only the 'always' branch had ever run. 'off'
-    # is what every adopter starts on, so a regression here would meet all of them.
-    mode: off
+    mode: always
     targets: [dev, test, main]
 
 changelog:
