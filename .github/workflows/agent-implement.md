@@ -1,5 +1,5 @@
 ---
-# Managed by @plainconceptsplatform/workflows@0.5.1. Source: loops/workflows/agent-implement.md. Profile digest: 0cd73e680659. Update with `workflows update --force`; consumer edits may be overwritten.
+# Managed by @plainconceptsplatform/workflows@0.5.1. Source: loops/workflows/agent-implement.md. Profile digest: 7da3f578364e. Update with `workflows update --force`; consumer edits may be overwritten.
 env:
   VERIFY_COMMANDS: "go build ./... && go test ./..."
   REPO_RULES: "Run gofmt over anything you change; a build that fails only on formatting wastes a whole run."
@@ -252,40 +252,6 @@ jobs:
           set -euo pipefail
           branch=$(gh pr view "$PR_NUMBER" --repo "$REPO" --json headRefName --jq '.headRefName')
           echo "branch=${branch}" >> "$GITHUB_OUTPUT"
-      # GitHub starts no workflow for an event raised by GITHUB_TOKEN, and the safe-output
-      # handler opens the pull request with it. So a bot pull request gets no CI run at all:
-      # `gh pr checks` reports none, the merge gate has no verdict to read, and the reconcile
-      # belt hands the pull request to a person once its wait expires. That is the escape
-      # hatch, not the loop working, and it was observed on the canary rather than reasoned
-      # about (17/09/2026).
-      #
-      # A dispatch is one of the two events GITHUB_TOKEN may raise, so the run is started here
-      # rather than with a stored credential. Two routes were ruled out first: a token whose
-      # events do start workflows cannot be an App installation token, because those expire
-      # hourly and cannot cross a job boundary (GitHub redacts secrets in job outputs); and a
-      # personal access token acts as a human, which would break the three router conditions
-      # that identify this loop's own work by `endsWith(github.actor, '[bot]')`.
-      #
-      # The dispatch names the pull request, because CI's hand-off job has no pull_request
-      # context to read it from, and it runs at the head branch so CI verifies the code under
-      # review (FR-069).
-      - name: Start CI for the pull request
-        if: needs.safe_outputs.outputs.created_pr_number != '' && steps.change-branch.outputs.branch != ''
-        env:
-          GH_TOKEN: ${{ github.token }}
-          REPO: ${{ github.repository }}
-          PR_NUMBER: ${{ needs.safe_outputs.outputs.created_pr_number }}
-          BRANCH: ${{ steps.change-branch.outputs.branch }}
-          CI_WORKFLOW: "CI"
-        run: |
-          set -euo pipefail
-          if gh workflow run "$CI_WORKFLOW" --repo "$REPO" --ref "$BRANCH" -f "pr-number=${PR_NUMBER}"; then
-            echo "Started ${CI_WORKFLOW} on ${BRANCH} for #${PR_NUMBER}."
-          else
-            # Not fatal: the reconcile belt still sweeps a pull request with no CI run, and a
-            # red conclude here would hide a pull request that is otherwise correct.
-            echo "::warning::Could not start ${CI_WORKFLOW} for #${PR_NUMBER}; the reconcile belt will pick it up."
-          fi
       - name: Record the pull request and branch on the issue
         if: needs.safe_outputs.outputs.created_pr_number != ''
         uses: ./.github/actions/record-change-linkage

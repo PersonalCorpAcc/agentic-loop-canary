@@ -74,6 +74,21 @@ branching:
     main: 5m
   changelogOn: [main]
 
+  # Unattended merge, into the first stage only. Both halves have to agree before
+  # anything merges itself: the mode must not be `off`, and the pull request's base must
+  # be named here. That is what lets `dev` be unattended without implying anything about
+  # `main`, which this deliberately does not name.
+  #
+  # It stays off for `test` and `main` because promotion between stages is a
+  # deterministic route rather than a gate decision, and because the point of a soak is
+  # that something could still stop it.
+  #
+  # `risk-based` is in the schema and refused at projection (T134): the choice today is
+  # `off` or `always`.
+  autoMerge:
+    mode: always
+    targets: [dev]
+
 changelog:
   path: CHANGELOG.json
 

@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Managed by @plainconceptsplatform/workflows@0.5.1. Source: loops/actions/validate-merge-gate-output/validate-merge-gate-output.sh. Profile digest: 0cd73e680659. Update with `workflows update --force`; consumer edits may be overwritten.
+# Managed by @plainconceptsplatform/workflows@0.5.1. Source: loops/actions/validate-merge-gate-output/validate-merge-gate-output.sh. Profile digest: 7da3f578364e. Update with `workflows update --force`; consumer edits may be overwritten.
 # Print the deterministic merge-gate outcome: merge, approve, review, remediated, or invalid.
 #
 # `merge` and `approve` are the same judgement about the change and different answers to
