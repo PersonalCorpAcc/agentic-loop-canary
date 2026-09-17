@@ -1,1 +1,11 @@
-{"changes":[]}
+{
+  "changes": [
+    {
+      "timestamp": "2026-09-17T20:00:17Z",
+      "issue": 8,
+      "title": "Add Sort for version slices",
+      "summary": "Add internal/semver package with Sort for version slices",
+      "commit": "d2714a3"
+    }
+  ]
+}
