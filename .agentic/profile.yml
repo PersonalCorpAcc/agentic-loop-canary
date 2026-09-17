@@ -65,6 +65,14 @@ branching:
   strategy: branch-chain
   cutFrom: main
   chain: [dev, test, main]
+  # Two issues may be implemented at once. The shipped default is 1, which is what the
+  # inherited loop did: one global group, every implement waiting for the one before it. Two
+  # keys the group per issue instead, so duplicate events for one issue still collapse while
+  # different issues proceed in parallel.
+  #
+  # A concurrency group cannot express "at most N", so this selects the shape rather than a
+  # limit: above 1 the ceiling is the runner fleet, not this number.
+  concurrentImplements: 2
   mergeMethod: rebase
   closeIssueOn: main
   branchNaming: agent/{issue}-{run}
