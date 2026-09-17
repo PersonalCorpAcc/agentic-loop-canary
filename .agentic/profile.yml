@@ -24,15 +24,20 @@ runners:
 # than the model. Opus 5 is $5/$25 per MTok, Sonnet 5 $2/$10, Haiku 4.5 $1/$5, so this is
 # roughly 60% off and the routes that write and review code keep a strong model.
 #
-# `models` overrides the model for one route (FR-077). Triage applies labels and release
-# bumps a version: both are short and structured, and neither writes or reviews code. The
-# merge gate is not on that list -- it reads a diff and decides whether it may land.
+# `models` overrides the model for one route (FR-077). Only release is overridden, and only
+# because it is the one route with no judgement in it: read a git log, categorise commits by
+# conventional-commit prefix, write notes, stop. A deterministic job does the tagging and the
+# publishing, its input is bounded, and a wrong answer is visible in the notes.
+#
+# Triage is deliberately *not* on Haiku, though it looks like the obvious candidate. It runs
+# ten checks including a security-risk scan and a danger-level assessment, and its verdict
+# decides whether work starts at all; it also compares the issue against every open issue for
+# duplicates, which grows, and Haiku 4.5 holds 200K of context against Sonnet 5's 1M.
 llm:
   engine: claude
   model: claude-sonnet-5
   secret: ANTHROPIC_API_KEY
   models:
-    triage: claude-haiku-4-5
     release: claude-haiku-4-5
 
 # The App this loop acts as. `appLogin` must be the App's own bot login, which GitHub
