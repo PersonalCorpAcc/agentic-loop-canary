@@ -1,5 +1,5 @@
 ---
-# Managed by @plainconceptsplatform/workflows@0.5.1. Source: loops/workflows/agent-merge-gate.md. Profile digest: 477494a3b05c. Update with `workflows update --force`; consumer edits may be overwritten.
+# Managed by @plainconceptsplatform/workflows@0.5.1. Source: loops/workflows/agent-merge-gate.md. Profile digest: c6b36da330d1. Update with `workflows update --force`; consumer edits may be overwritten.
 env:
   VERIFY_COMMANDS: "go build ./... && go test ./..."
   REPO_RULES: "Run gofmt over anything you change; a build that fails only on formatting wastes a whole run."
@@ -55,11 +55,8 @@ name: "Agent: Merge Gate"
 # Router-only worker. The Work Router owns triggers, classification, and rung 1-2 checks.
 # This workflow receives the classified inputs and runs rung 3+.
 imports:
-  - github/gh-aw/.github/workflows/shared/opencode.md@v0.87.5
   - shared/platform-defaults.md
-  - shared/opencode-ci.md
   - shared/stack-go.md
-
 on:
   workflow_call:
     inputs:
@@ -631,16 +628,9 @@ if: always() && needs.subject.outputs.found == 'true' && (needs.protected_change
 runs-on: ubuntu-latest
 runs-on-slim: ubuntu-latest
 
-secrets:
-  OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
-
 engine:
-  id: opencode
-  version: "1.2.14"
-  env:
-    OPENAI_BASE_URL: https://forge.plainconcepts.com/v1
-
-model: openai/glm-5-3
+  id: claude
+model: claude-haiku-4-5
 
 max-turns: 300
 max-turn-cache-misses: 3000

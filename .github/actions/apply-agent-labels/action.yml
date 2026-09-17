@@ -1,4 +1,4 @@
-# Managed by @plainconceptsplatform/workflows@0.5.1. Source: loops/actions/apply-agent-labels/action.yml. Profile digest: 477494a3b05c. Update with workflows update --force; consumer edits may be overwritten.
+# Managed by @plainconceptsplatform/workflows@0.5.1. Source: loops/actions/apply-agent-labels/action.yml. Profile digest: c6b36da330d1. Update with workflows update --force; consumer edits may be overwritten.
 name: Apply agent labels
 description: Apply every add_labels and remove_labels item from agent_output.json.
 inputs:

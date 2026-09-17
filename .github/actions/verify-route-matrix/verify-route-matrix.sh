@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Managed by @plainconceptsplatform/workflows@0.5.1. Source: loops/actions/verify-route-matrix/verify-route-matrix.sh. Profile digest: 477494a3b05c. Update with `workflows update --force`; consumer edits may be overwritten.
+# Managed by @plainconceptsplatform/workflows@0.5.1. Source: loops/actions/verify-route-matrix/verify-route-matrix.sh. Profile digest: c6b36da330d1. Update with `workflows update --force`; consumer edits may be overwritten.
 # Exercise the router's real classifier. This sources classify-route.sh rather than
 # restating it, so a change to the route table cannot pass here by being copied twice.
 #
@@ -1046,6 +1046,68 @@ while read -r operation; do
   fi
 done < <(sed -n '/^      operation:/,/^      issue-number:/p' "$ROUTER_YML" |
   sed -n 's/^          - //p')
+
+# ── Route models ──────────────────────────────────────────────────────────
+# The model is choosable per route (FR-077), so the worker that runs a route must name the
+# model the profile chose for that route and no other. Nothing else would notice: a worker
+# carrying a model no profile names compiles, runs, and bills the adopter for a model they
+# did not pick. The pairs come from the profile's own projected constants, because the
+# matrix runs from installed files and cannot know the profile.
+#
+# A worker the repository did not select is skipped rather than failed -- which capabilities
+# are installed is a different question, asked elsewhere.
+readonly ROUTE_MODELS="agent-implement.md=claude-opus-5 agent-refine.md=claude-opus-5 agent-triage.md=claude-haiku-4-5 agent-apply-review.md=claude-opus-5 agent-merge-gate.md=claude-haiku-4-5 agent-audit.md=claude-opus-5 agent-release.md=claude-opus-5"
+
+for pair in $ROUTE_MODELS; do
+  worker="${HERE}/../../workflows/${pair%%=*}"
+  expected_model="${pair#*=}"
+  [ -f "$worker" ] || continue
+
+  actual_model="$(sed -n "s/^model: //p" "$worker" | head -1)"
+  assert "${pair%%=*} runs the model the profile chose for its route" "$expected_model" "$actual_model"
+done
+
+# ── Engine credentials ────────────────────────────────────────────────────
+# This repository runs one engine, and only that engine's credential variables may appear in
+# a file this package installed (FR-076, FR-067). The framework derives a worker's
+# `workflow_call.secrets` block from the engine alone -- verified by compiling one worker per
+# engine, 17/09/2026 -- so a caller naming `OPENAI_API_KEY` against a `claude` worker is a
+# secret the callee never declared, which GitHub rejects before a job is created, and a
+# repository that compiled cleanly still cannot run.
+#
+# The scan is the files this package installs, and deliberately not the locks compiled from
+# them. COPILOT_GITHUB_TOKEN means two things: under `copilot` it is the credential, and under
+# every other engine the framework still declares it in the lock for its own OAuth-token
+# probe. Scanning generated output would fail four engines for a name the framework chose,
+# and the lock is derived from the sources this does scan.
+readonly ENGINE_ID="claude"
+readonly FOREIGN_CREDENTIAL_VARS="CODEX_API_KEY COPILOT_GITHUB_TOKEN GEMINI_API_KEY OPENAI_API_KEY"
+
+engine_scan_files() {
+  local candidate
+  for candidate in \
+    "${HERE}/../../workflows/work-router.yml" \
+    "${HERE}/../../workflows/authorize-bot-work.yml" \
+    "${HERE}"/../../workflows/agent-*.md \
+    "${HERE}"/../../workflows/shared/*.md \
+    "${HERE}/../../../opencode.ci.json"; do
+    if [ -f "$candidate" ]; then printf '%s\n' "$candidate"; fi
+  done
+}
+
+for variable in $FOREIGN_CREDENTIAL_VARS; do
+  offenders=""
+  while read -r scanned; do
+    if grep -qF "$variable" "$scanned"; then offenders="${offenders} ${scanned##*/}"; fi
+  done < <(engine_scan_files)
+
+  if [ -z "$offenders" ]; then
+    PASS=$((PASS + 1))
+  else
+    FAIL=$((FAIL + 1))
+    echo "FAIL: this repository runs '${ENGINE_ID}', which never reads ${variable}, but it is named in:${offenders}" >&2
+  fi
+done
 
 echo
 if [ "$FAIL" -eq 0 ]; then

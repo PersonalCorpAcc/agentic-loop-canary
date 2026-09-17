@@ -1,5 +1,5 @@
 ---
-# Managed by @plainconceptsplatform/workflows@0.5.1. Source: loops/workflows/agent-refine.md. Profile digest: 477494a3b05c. Update with `workflows update --force`; consumer edits may be overwritten.
+# Managed by @plainconceptsplatform/workflows@0.5.1. Source: loops/workflows/agent-refine.md. Profile digest: c6b36da330d1. Update with `workflows update --force`; consumer edits may be overwritten.
 env:
   REPO_RULES: "Run gofmt over anything you change; a build that fails only on formatting wastes a whole run."
   PLAN_EXPLORE_SKILL: plan-explore
@@ -48,11 +48,8 @@ description: |
 name: "Agent: Refine Issue"
 
 imports:
-  - github/gh-aw/.github/workflows/shared/opencode.md@v0.87.5
   - shared/platform-defaults.md
-  - shared/opencode-ci.md
   - shared/stack-go.md
-
 on:
   workflow_call:
     inputs:
@@ -363,19 +360,9 @@ if: inputs.issue-number != ''
 runs-on: ubuntu-latest
 runs-on-slim: ubuntu-latest
 
-secrets:
-  OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
-
 engine:
-  id: opencode
-  version: "1.2.14"
-  env:
-    OPENAI_BASE_URL: https://forge.plainconcepts.com/v1
-  args:
-    - "--model"
-    - "forge/glm-5-3"
-
-model: openai/glm-5-3
+  id: claude
+model: claude-opus-5
 max-turns: 500
 max-turn-cache-misses: 4000
 max-ai-credits: 8000

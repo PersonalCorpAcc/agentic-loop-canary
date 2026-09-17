@@ -1,4 +1,4 @@
-# Managed by @plainconceptsplatform/workflows@0.5.1. Source: loops/workflows/work-router.yml. Profile digest: 477494a3b05c. Update with `workflows update --force`; consumer edits may be overwritten.
+# Managed by @plainconceptsplatform/workflows@0.5.1. Source: loops/workflows/work-router.yml. Profile digest: c6b36da330d1. Update with `workflows update --force`; consumer edits may be overwritten.
 name: "All Work Router"
 
 # Owns every repository automation trigger. Classifies each event into exactly one route,
@@ -109,25 +109,21 @@ on:
     types: [completed]
 
   # Cron to route mapping lives in .github/actions/classify-route/classify-route.sh.
-  # Every schedule this loop installs, commented out on purpose while the canary is
-  # being set up: installing starts five clocks, and a repository whose App is not yet
-  # installed spends its Actions allowance on runs that all fail at the credential
-  # step. Uncomment them when `doctor` passes (T193).
-  # schedule:
-  #   # Every consumer installs this same file, and the agent fleet is one shared, two-VM scale
-  #   # set, so two repositories left on the same minute audit at the same minute. The slot is
-  #   # a profile value (`crons.audit`); see "Scheduling across repositories" in the package
-  #   # README for the organisation's table.
-  #   #
-  #   # Every one of these is projected from the same profile entry the classifier reads, so
-  #   # the two cannot disagree. They used to be literals in both files with a comment asking
-  #   # the reader to keep them in step, and a schedule that fires at a minute the classifier
-  #   # does not recognise routes nowhere: the run is green and the work never happens.
-  #   - cron: "17 1 * * 1"
-  #   - cron: "43 3 * * *"
-  #   - cron: "0 6 * * *"
-  #   - cron: "17 * * * *"
-  #   - cron: "*/30 * * * *" # promotion; the line goes where there is nowhere to promote into (FR-031)
+  schedule:
+    # Every consumer installs this same file, and the agent fleet is one shared, two-VM scale
+    # set, so two repositories left on the same minute audit at the same minute. The slot is
+    # a profile value (`crons.audit`); see "Scheduling across repositories" in the package
+    # README for the organisation's table.
+    #
+    # Every one of these is projected from the same profile entry the classifier reads, so
+    # the two cannot disagree. They used to be literals in both files with a comment asking
+    # the reader to keep them in step, and a schedule that fires at a minute the classifier
+    # does not recognise routes nowhere: the run is green and the work never happens.
+    - cron: "17 1 * * 1"
+    - cron: "43 3 * * *"
+    - cron: "0 6 * * *"
+    - cron: "17 * * * *"
+    - cron: "*/30 * * * *" # promotion; the line goes where there is nowhere to promote into (FR-031)
 
   workflow_dispatch:
     inputs:
@@ -418,9 +414,7 @@ jobs:
       issue-number: ${{ needs.classify.outputs.issue-number }}
       mode: ${{ needs.classify.outputs.refine-mode }}
     secrets:
-      OPENAI_API_KEY: ${{ secrets.MODEL_API_KEY }}
-      CODEX_API_KEY: ${{ secrets.MODEL_API_KEY }}
-      COPILOT_GITHUB_TOKEN: ${{ secrets.MODEL_API_KEY }}
+      ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
       BOT_APP_ID: ${{ secrets.BOT_APP_ID }}
       BOT_PRIVATE_KEY: ${{ secrets.BOT_PRIVATE_KEY }}
 
@@ -533,9 +527,7 @@ jobs:
       issue-number: ${{ needs.classify.outputs.issue-number }}
       attempts_so_far: ${{ needs.classify.outputs.implement-attempts }}
     secrets:
-      OPENAI_API_KEY: ${{ secrets.MODEL_API_KEY }}
-      CODEX_API_KEY: ${{ secrets.MODEL_API_KEY }}
-      COPILOT_GITHUB_TOKEN: ${{ secrets.MODEL_API_KEY }}
+      ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
       BOT_APP_ID: ${{ secrets.BOT_APP_ID }}
       BOT_PRIVATE_KEY: ${{ secrets.BOT_PRIVATE_KEY }}
 
@@ -602,9 +594,7 @@ jobs:
       issue-number: ${{ needs.classify.outputs.issue-number }}
       mode: ${{ needs.classify.outputs.triage-mode }}
     secrets:
-      OPENAI_API_KEY: ${{ secrets.MODEL_API_KEY }}
-      CODEX_API_KEY: ${{ secrets.MODEL_API_KEY }}
-      COPILOT_GITHUB_TOKEN: ${{ secrets.MODEL_API_KEY }}
+      ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
       BOT_APP_ID: ${{ secrets.BOT_APP_ID }}
       BOT_PRIVATE_KEY: ${{ secrets.BOT_PRIVATE_KEY }}
 
@@ -620,9 +610,7 @@ jobs:
       pr-number: ${{ needs.classify.outputs.pr-number }}
       linked-issue: ${{ needs.classify.outputs.linked-issue }}
     secrets:
-      OPENAI_API_KEY: ${{ secrets.MODEL_API_KEY }}
-      CODEX_API_KEY: ${{ secrets.MODEL_API_KEY }}
-      COPILOT_GITHUB_TOKEN: ${{ secrets.MODEL_API_KEY }}
+      ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
       BOT_APP_ID: ${{ secrets.BOT_APP_ID }}
       BOT_PRIVATE_KEY: ${{ secrets.BOT_PRIVATE_KEY }}
 
@@ -723,9 +711,7 @@ jobs:
       ci-run-id: ${{ needs.classify.outputs.ci-run-id }}
       attempts_so_far: ${{ needs.classify.outputs.merge-gate-attempts }}
     secrets:
-      OPENAI_API_KEY: ${{ secrets.MODEL_API_KEY }}
-      CODEX_API_KEY: ${{ secrets.MODEL_API_KEY }}
-      COPILOT_GITHUB_TOKEN: ${{ secrets.MODEL_API_KEY }}
+      ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
       BOT_APP_ID: ${{ secrets.BOT_APP_ID }}
       BOT_PRIVATE_KEY: ${{ secrets.BOT_PRIVATE_KEY }}
 
@@ -740,9 +726,7 @@ jobs:
     with:
       trigger-kind: ${{ needs.classify.outputs.trigger-kind }}
     secrets:
-      OPENAI_API_KEY: ${{ secrets.MODEL_API_KEY }}
-      CODEX_API_KEY: ${{ secrets.MODEL_API_KEY }}
-      COPILOT_GITHUB_TOKEN: ${{ secrets.MODEL_API_KEY }}
+      ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
       BOT_APP_ID: ${{ secrets.BOT_APP_ID }}
       BOT_PRIVATE_KEY: ${{ secrets.BOT_PRIVATE_KEY }}
 
@@ -754,7 +738,7 @@ jobs:
     with:
       version-bump: ${{ github.event.inputs.version-bump || 'auto' }}
     secrets:
-      OPENAI_API_KEY: ${{ secrets.MODEL_API_KEY }}
+      ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
 
   bot-approve:
     needs: classify
