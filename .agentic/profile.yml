@@ -74,20 +74,25 @@ branching:
     main: 5m
   changelogOn: [main]
 
-  # Unattended merge, into the first stage only. Both halves have to agree before
-  # anything merges itself: the mode must not be `off`, and the pull request's base must
-  # be named here. That is what lets `dev` be unattended without implying anything about
-  # `main`, which this deliberately does not name.
+  # Unattended merge into every stage, so the whole promotion runs without a person and can
+  # be watched doing it. Both halves still have to agree before anything merges itself: the
+  # mode must not be `off`, and the pull request's base must be named here.
   #
-  # It stays off for `test` and `main` because promotion between stages is a
-  # deterministic route rather than a gate decision, and because the point of a soak is
-  # that something could still stop it.
+  # This is a canary setting, not a recommendation. The shipped default is `off`, and an
+  # adopter should start there and open one stage at a time. Naming `main` means a change can
+  # travel from an issue to the default branch with nobody in the path -- which is the thing
+  # this repository exists to demonstrate, and the thing a real repository should decide
+  # deliberately rather than inherit.
+  #
+  # The soak still applies between stages: `targets` says a merge may happen unattended, not
+  # that it happens immediately. A promotion that has not soaked is still refused, and a
+  # revert on an earlier stage still stops the change travelling (T126).
   #
   # `risk-based` is in the schema and refused at projection (T134): the choice today is
   # `off` or `always`.
   autoMerge:
     mode: always
-    targets: [dev]
+    targets: [dev, test, main]
 
 changelog:
   path: CHANGELOG.json
