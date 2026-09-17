@@ -1,5 +1,5 @@
 ---
-# Managed by @plainconceptsplatform/workflows@0.5.1. Source: loops/workflows/agent-merge-gate.md. Profile digest: 588652f49de4. Update with `workflows update --force`; consumer edits may be overwritten.
+# Managed by @plainconceptsplatform/workflows@0.5.1. Source: loops/workflows/agent-merge-gate.md. Profile digest: fb7875f50ae3. Update with `workflows update --force`; consumer edits may be overwritten.
 env:
   VERIFY_COMMANDS: "go build ./... && go test ./..."
   REPO_RULES: "Run gofmt over anything you change; a build that fails only on formatting wastes a whole run."
@@ -30,7 +30,7 @@ env:
   # a human gate is branch protection plus somebody's judgement, not a sentence in a prompt
   # (FR-035, FR-036).
   AUTO_MERGE_MODE: "always"
-  AUTO_MERGE_TARGETS: "dev"
+  AUTO_MERGE_TARGETS: "dev,test,main"
   GATE_MARKER: "<!-- agent-merge-gate -->"
   ATTEMPT_MARKER: "<!-- agent-merge-gate-attempt -->"
   MAX_ATTEMPTS: "6"

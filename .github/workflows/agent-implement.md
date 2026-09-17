@@ -1,5 +1,5 @@
 ---
-# Managed by @plainconceptsplatform/workflows@0.5.1. Source: loops/workflows/agent-implement.md. Profile digest: 588652f49de4. Update with `workflows update --force`; consumer edits may be overwritten.
+# Managed by @plainconceptsplatform/workflows@0.5.1. Source: loops/workflows/agent-implement.md. Profile digest: fb7875f50ae3. Update with `workflows update --force`; consumer edits may be overwritten.
 env:
   VERIFY_COMMANDS: "go build ./... && go test ./..."
   REPO_RULES: "Run gofmt over anything you change; a build that fails only on formatting wastes a whole run."
@@ -79,8 +79,10 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       issues: read
+      pull-requests: read
     outputs:
       eligible: ${{ steps.check.outputs.eligible }}
+      duplicate: ${{ steps.duplicate.outputs.open }}
     steps:
       - name: Skip issues planned for the future
         id: check
@@ -110,9 +112,62 @@ jobs:
 
           echo "eligible=true" >> "$GITHUB_OUTPUT"
 
+      # Asked here, and not only in the router, because here is inside the concurrency
+      # group. The router asks the moment an event arrives: two events for one issue both
+      # ask, both get the same answer -- no pull request yet -- and both queue a worker. By
+      # the time the second worker runs the first has opened one, and the answer the router
+      # acted on is stale. That produced two agent runs and two pull requests for issue #5
+      # on 17/09/2026 (#6 and #7).
+      #
+      # A concurrency group permits one running job at a time, so the second worker starts
+      # only after the first has finished. Asking again here is therefore sufficient, and it
+      # is all that is needed: GitHub provides the mutual exclusion and this provides the
+      # idempotency. An earlier attempt built a lock out of git refs -- atomic, and exactly
+      # the custom distributed locking GitHub's own guidance says not to write when a
+      # concurrency group and an idempotent check will do.
+      #
+      # Keyed on the App's own record of the pull request it opened (FR-064) rather than on
+      # a branch prefix: a prefix matches every branch this loop has open, so one unfinished
+      # pull request would stop every other issue being implemented.
+      - name: Checkout workflow actions
+        if: steps.check.outputs.eligible == 'true'
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Read the linkage the App recorded
+        id: linkage
+        if: steps.check.outputs.eligible == 'true'
+        uses: ./.github/actions/resolve-change-linkage
+        with:
+          token: ${{ github.token }}
+          issue-number: ${{ inputs.issue-number }}
+          bot-login: agentic-loop-canary[bot]
+      - name: Stop if this issue already has an open pull request
+        id: duplicate
+        if: steps.check.outputs.eligible == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          ISSUE_NUMBER: ${{ inputs.issue-number }}
+          LINKED_PR: ${{ steps.linkage.outputs.pr }}
+        run: |
+          set -euo pipefail
+          if [ -z "${LINKED_PR:-}" ]; then
+            echo "open=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          state=$(gh pr view "$LINKED_PR" --repo "$REPO" --json state --jq .state 2>/dev/null || echo UNKNOWN)
+          if [ "$state" = "OPEN" ]; then
+            echo "open=true" >> "$GITHUB_OUTPUT"
+            echo "::notice::#${ISSUE_NUMBER} already has open pull request #${LINKED_PR} from this loop. This run stops rather than opening a second one."
+          else
+            # Merged or closed means a re-implement is legitimate.
+            echo "open=false" >> "$GITHUB_OUTPUT"
+          fi
+
   reserve:
     needs: [eligibility]
-    if: needs.eligibility.outputs.eligible == 'true'
+    if: needs.eligibility.outputs.eligible == 'true' && needs.eligibility.outputs.duplicate != 'true'
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -420,7 +475,7 @@ jobs:
             [View this workflow run](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }})
   agent:
     needs: [eligibility]
-    if: needs.eligibility.outputs.eligible == 'true'
+    if: needs.eligibility.outputs.eligible == 'true' && needs.eligibility.outputs.duplicate != 'true'
 
 if: inputs.issue-number != ''
 
