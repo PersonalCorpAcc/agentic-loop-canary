@@ -109,21 +109,25 @@ on:
     types: [completed]
 
   # Cron to route mapping lives in .github/actions/classify-route/classify-route.sh.
-  schedule:
-    # Every consumer installs this same file, and the agent fleet is one shared, two-VM scale
-    # set, so two repositories left on the same minute audit at the same minute. The slot is
-    # a profile value (`crons.audit`); see "Scheduling across repositories" in the package
-    # README for the organisation's table.
-    #
-    # Every one of these is projected from the same profile entry the classifier reads, so
-    # the two cannot disagree. They used to be literals in both files with a comment asking
-    # the reader to keep them in step, and a schedule that fires at a minute the classifier
-    # does not recognise routes nowhere: the run is green and the work never happens.
-    - cron: "17 1 * * 1"
-    - cron: "43 3 * * *"
-    - cron: "0 6 * * *"
-    - cron: "17 * * * *"
-    - cron: "*/30 * * * *" # promotion; the line goes where there is nowhere to promote into (FR-031)
+  # Every schedule this loop installs, commented out on purpose while the canary is
+  # being set up: installing starts five clocks, and a repository whose App is not yet
+  # installed spends its Actions allowance on runs that all fail at the credential
+  # step. Uncomment them when `doctor` passes (T193).
+  # schedule:
+  #   # Every consumer installs this same file, and the agent fleet is one shared, two-VM scale
+  #   # set, so two repositories left on the same minute audit at the same minute. The slot is
+  #   # a profile value (`crons.audit`); see "Scheduling across repositories" in the package
+  #   # README for the organisation's table.
+  #   #
+  #   # Every one of these is projected from the same profile entry the classifier reads, so
+  #   # the two cannot disagree. They used to be literals in both files with a comment asking
+  #   # the reader to keep them in step, and a schedule that fires at a minute the classifier
+  #   # does not recognise routes nowhere: the run is green and the work never happens.
+  #   - cron: "17 1 * * 1"
+  #   - cron: "43 3 * * *"
+  #   - cron: "0 6 * * *"
+  #   - cron: "17 * * * *"
+  #   - cron: "*/30 * * * *" # promotion; the line goes where there is nowhere to promote into (FR-031)
 
   workflow_dispatch:
     inputs:
