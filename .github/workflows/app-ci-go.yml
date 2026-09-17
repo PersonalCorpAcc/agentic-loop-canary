@@ -6,6 +6,16 @@ on:
   schedule:
     - cron: "0 6 * * 1"
   workflow_dispatch:
+    inputs:
+      pr-number:
+        description: >-
+          The bot pull request this run is verifying. Set by the implement worker after it
+          opens one, because GitHub starts no workflow for a pull request opened with
+          GITHUB_TOKEN: without this the pull request has no CI run at all, the merge gate
+          has no verdict to read, and the reconcile belt hands it to a person after its
+          wait expires. Empty for an ordinary manual run.
+        required: false
+        type: string
 
 # Toolchain pins only. The Go version comes from the repository's own go.mod, and every
 # command below is the profile's: the pack's plain toolchain commands unless a project
@@ -107,11 +117,17 @@ jobs:
     name: Dispatch merge gate
     needs: [test]
     if: >
-      always() &&
-      github.event_name == 'pull_request' &&
-      github.event.pull_request.head.repo.full_name == github.repository &&
-      github.event.pull_request.draft == false &&
-      github.event.pull_request.user.type == 'Bot'
+      always() && (
+        (
+          github.event_name == 'pull_request' &&
+          github.event.pull_request.head.repo.full_name == github.repository &&
+          github.event.pull_request.draft == false &&
+          github.event.pull_request.user.type == 'Bot'
+        ) || (
+          github.event_name == 'workflow_dispatch' &&
+          inputs.pr-number != ''
+        )
+      )
     runs-on: ubuntu-latest
     timeout-minutes: 5
     permissions:
@@ -128,7 +144,7 @@ jobs:
         uses: ./.github/actions/dispatch-merge-gate
         with:
           results: ${{ join(needs.*.result, ' ') }}
-          pr-number: ${{ github.event.pull_request.number }}
+          pr-number: ${{ github.event.pull_request.number || inputs.pr-number }}
           run-id: ${{ github.run_id }}
           # The repository default branch, deliberately, and not the profile's branch point: a
           # dispatch runs the workflow file at the ref it names, and every event-triggered run

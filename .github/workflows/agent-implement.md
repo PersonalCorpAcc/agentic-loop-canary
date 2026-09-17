@@ -252,6 +252,40 @@ jobs:
           set -euo pipefail
           branch=$(gh pr view "$PR_NUMBER" --repo "$REPO" --json headRefName --jq '.headRefName')
           echo "branch=${branch}" >> "$GITHUB_OUTPUT"
+      # GitHub starts no workflow for an event raised by GITHUB_TOKEN, and the safe-output
+      # handler opens the pull request with it. So a bot pull request gets no CI run at all:
+      # `gh pr checks` reports none, the merge gate has no verdict to read, and the reconcile
+      # belt hands the pull request to a person once its wait expires. That is the escape
+      # hatch, not the loop working, and it was observed on the canary rather than reasoned
+      # about (17/09/2026).
+      #
+      # A dispatch is one of the two events GITHUB_TOKEN may raise, so the run is started here
+      # rather than with a stored credential. Two routes were ruled out first: a token whose
+      # events do start workflows cannot be an App installation token, because those expire
+      # hourly and cannot cross a job boundary (GitHub redacts secrets in job outputs); and a
+      # personal access token acts as a human, which would break the three router conditions
+      # that identify this loop's own work by `endsWith(github.actor, '[bot]')`.
+      #
+      # The dispatch names the pull request, because CI's hand-off job has no pull_request
+      # context to read it from, and it runs at the head branch so CI verifies the code under
+      # review (FR-069).
+      - name: Start CI for the pull request
+        if: needs.safe_outputs.outputs.created_pr_number != '' && steps.change-branch.outputs.branch != ''
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          PR_NUMBER: ${{ needs.safe_outputs.outputs.created_pr_number }}
+          BRANCH: ${{ steps.change-branch.outputs.branch }}
+          CI_WORKFLOW: "CI"
+        run: |
+          set -euo pipefail
+          if gh workflow run "$CI_WORKFLOW" --repo "$REPO" --ref "$BRANCH" -f "pr-number=${PR_NUMBER}"; then
+            echo "Started ${CI_WORKFLOW} on ${BRANCH} for #${PR_NUMBER}."
+          else
+            # Not fatal: the reconcile belt still sweeps a pull request with no CI run, and a
+            # red conclude here would hide a pull request that is otherwise correct.
+            echo "::warning::Could not start ${CI_WORKFLOW} for #${PR_NUMBER}; the reconcile belt will pick it up."
+          fi
       - name: Record the pull request and branch on the issue
         if: needs.safe_outputs.outputs.created_pr_number != ''
         uses: ./.github/actions/record-change-linkage
@@ -596,19 +630,20 @@ timeout-minutes: 90
       empty there is none: fix the formatting the linter reports by hand. Never create a pull
       request that has lint errors.
 
-   5. Before creating the pull request, check whether an open bot pull request already
-      exists that closes #${{ inputs.issue-number }}. Run:
+   5. **No open bot pull request exists for this issue.** The router's `check-implement-pr` job asked before this worker started -- it reads the linkage the
+      App recorded, through `resolve-change-linkage` -- and this worker only runs when the
+      answer is no. So create a pull request; do not go looking for one.
 
-      ```
-       gh pr list --repo "$GITHUB_REPOSITORY" --state open --json number,headRefName,author,body --jq '[.[] | select(.author.login | startswith("app/") or endswith("[bot]")) | (.body | ascii_downcase) as $body | select($body | contains("close #${{ inputs.issue-number }}") or contains("closes #${{ inputs.issue-number }}") or contains("closed #${{ inputs.issue-number }}") or contains("fix #${{ inputs.issue-number }}") or contains("fixes #${{ inputs.issue-number }}") or contains("fixed #${{ inputs.issue-number }}") or contains("resolve #${{ inputs.issue-number }}") or contains("resolves #${{ inputs.issue-number }}") or contains("resolved #${{ inputs.issue-number }}"))] | if length > 0 then .[0] else empty end'
-      ```
+      Two reasons this is stated rather than left to you. Asking again costs a call to the
+      forge for an answer the loop already has. And the query that used to be written here
+      searched pull request bodies for `closes #N`, which this loop deliberately stopped
+      writing when the issue link became an App-authored comment: it could match nothing,
+      and it would have reported "no existing pull request" even where one existed.
 
-      If a PR already exists, do **not** create a new branch or PR. Push your changes to
-      the existing PR's branch (`headRefName`) instead, then call
-      `safeoutputs/push_to_pull_request_branch` rather than `safeoutputs/create_pull_request`.
-      This prevents duplicate PRs when a retry is triggered after a merge-gate failure.
-
-      If no existing PR is found, proceed to create a new one as described below.
+   6. **Name your branch short and bare**, like `add-semver-parsing` or `fix-login-form`.
+      The framework prepends this loop's own prefix -- issue number and run id -- so a name
+      that repeats it produces `agent/3-1234/agent/3-add-semver-parsing`. Do not include
+      `agent/`, the issue number or the run id yourself.
 
       Do not touch `changelog.json`. The workflow records the change itself once the work is
       on the default branch. Every implement used to edit that one file, so two runs whose
