@@ -1,4 +1,4 @@
-# Managed by @plainconceptsplatform/workflows@0.5.1. Source: loops/workflows/work-router.yml. Profile digest: fb7875f50ae3. Update with `workflows update --force`; consumer edits may be overwritten.
+# Managed by @plainconceptsplatform/workflows@0.5.1. Source: loops/workflows/work-router.yml. Profile digest: 1a8a08322b06. Update with `workflows update --force`; consumer edits may be overwritten.
 name: "All Work Router"
 
 # Owns every repository automation trigger. Classifies each event into exactly one route,
@@ -464,13 +464,24 @@ jobs:
           # bot-actor titles are counted, so a human's "waiting for bot-working" run can
           # never block the real one.
           #
+          # This is a pre-filter, not the guarantee. It reads run titles, which are
+          # presentation: they carry the issue's own text, they change when somebody edits
+          # `run-name`, and listing runs is eventually consistent, so two runs starting in the
+          # same second can both see nothing. What it buys is a skip before a runner starts,
+          # which nothing inside the worker can do.
+          #
+          # The guarantee is in the worker. `eligibility` runs while the concurrency group is
+          # held and asks the App's own record whether this issue already has an open pull
+          # request; a group permits one running job at a time, so by then the answer is true
+          # if it is going to be. That is GitHub's own advice -- a concurrency group for the
+          # exclusion, an idempotent check for the rest -- and it is why no custom lock is
+          # needed here.
+          #
           # Both run-name shapes, because there are two: an issue event renders
           # `Working (Implement): <title> (#8)` and a dispatch renders
-          # `Working (Implement): #8`. The guard matched only the first, so a dispatched
-          # implement was invisible to it -- and to itself. Labelling an issue `implement`
-          # and dispatching implement for it produced two agent runs and two pull requests
-          # for one issue, which is what happened to #5 on 17/09/2026 (#6 and #7). The
-          # concurrency group serialises the two workers; it does not deduplicate them.
+          # `Working (Implement): #8`. Matching only the first made a dispatched implement
+          # invisible to this filter, and to itself, which produced two agent runs and two
+          # pull requests for issue #5 on 17/09/2026 (#6 and #7).
           #
           # Anchored to the end of the title rather than found anywhere in it: a title
           # carries the issue's own text, so an issue named "Fix #80 handling" would read
@@ -534,11 +545,18 @@ jobs:
     if: needs.classify.outputs.route == 'implement' && needs.authorize.outputs.trusted == 'true' && needs.check-implement-pr.outputs.has-open-pr != 'true'
     uses: ./.github/workflows/agent-implement.lock.yml
     concurrency:
-      group: implement-global
+      # One group for the repository when `branching.concurrentImplements` is 1, which is the
+      # default and the inherited behaviour; one group per issue above that. There is no way to
+      # say "at most N" in a concurrency group, so the number selects the shape and the runner
+      # fleet is the real ceiling.
+      #
+      # The queue line travels with the global shape and appears only there. A group keeps one
+      # running and one pending run and a newer pending run replaces the older, so a single
+      # global group would implement one of six labelled issues and drop five -- hence the
+      # queue. Keyed per issue that default is exactly right: two events for one issue collapse
+      # into one pending run instead of producing two agents and two pull requests.
+      group: implement-${{ needs.classify.outputs.issue-number }}
       cancel-in-progress: false
-      # FIFO, up to 100 waiting. Without this the default `queue: single` cancels whatever
-      # was pending, so labelling six issues at once implements one and drops the rest.
-      queue: max
     permissions: write-all
     with:
       issue-number: ${{ needs.classify.outputs.issue-number }}
@@ -1034,9 +1052,15 @@ jobs:
           }
 
           # A gate already queued or running for this pull request will read the same CI verdict;
-          # a second dispatch queues behind merge-belt and the single-slot queue cancels it. Same
-          # live-run test as the reconcile belt's stale-reservation sweep, keyed on the exact
-          # title run-name gives a gate dispatch.
+          # a second dispatch queues behind merge-belt and the single-slot queue cancels it.
+          #
+          # So this is a pre-filter too: `merge-belt-<base>` is what makes a duplicate gate
+          # harmless, and this only avoids starting one. It matches the exact title a *dispatch*
+          # renders, which is the only shape that carries a pull request number -- a gate a
+          # human starts with the `merge-gate` label, or one a failed CI run triggers, has a
+          # different run name and is invisible here. That is acceptable for a filter and would
+          # not be for a guard, which is the distinction worth keeping in mind before this is
+          # ever relied on for correctness.
           gate_is_live() {
             local pr="$1" status live
             for status in queued in_progress waiting pending; do
@@ -1250,6 +1274,8 @@ jobs:
 
           # A gate already queued or running for this pull request will read the same CI verdict;
           # a second dispatch queues behind merge-belt and the single-slot queue cancels it.
+          # A pre-filter, as in the reconcile belt: the concurrency group is the mechanism, and
+          # this matches only the title a dispatch renders.
           gate_is_live() {
             local pr="$1" status live
             for status in queued in_progress waiting pending; do
@@ -1261,10 +1287,25 @@ jobs:
           }
 
           # Stale reservation sweep. Labelling ten issues at once labels all ten immediately,
-          # because authorize-bot-work is keyed per issue, while implement-global lets exactly
-          # one run at a time. A queued run that is cancelled therefore leaves its issue
-          # carrying bot-working with no run and no pull request: parked, invisible, and not
-          # re-triggerable, because classify refuses an issue that is already reserved.
+          # because authorize-bot-work is keyed per issue, while the implement concurrency group
+          # lets only as many run at a time as the profile allows. A queued run that is cancelled
+          # therefore leaves its issue carrying bot-working with no run and no pull request:
+          # parked, invisible, and not re-triggerable, because classify refuses an issue that is
+          # already reserved.
+          #
+          # This clears a reservation, so both gates have to be right. Two were not.
+          #
+          # The pull request gate searched bodies for `closes #N`. This loop stopped writing
+          # closing keywords when the issue link became an App-authored comment (FR-030, T104,
+          # T114), so it matched nothing for any issue and always answered "no pull request".
+          # The gate was therefore off, and the only thing standing between a live change and a
+          # cleared reservation was the run gate beside it. It now reads the App's own record,
+          # through the same script `resolve-change-linkage` uses, so the two cannot drift.
+          #
+          # The run gate matched `#N` anywhere in a run title, which is every route: a live
+          # triage or merge-gate run for the issue kept an abandoned implement reservation
+          # alive. It now counts implement runs only, by the two shapes an implement run name
+          # takes, anchored to the end of the title -- the same rule the duplicate guard uses.
           gh issue list --repo "$REPO" --label bot-working --state open --limit 100 \
             --json number --jq '.[].number' |
             while IFS= read -r issue; do
@@ -1273,14 +1314,26 @@ jobs:
               live=$(gh api "repos/$REPO/actions/runs?per_page=100" \
                 --jq "[.workflow_runs[]
                   | select(.status == \"queued\" or .status == \"in_progress\" or .status == \"pending\" or .status == \"waiting\")
-                  | select(.display_title | test(\"#${issue}\\b\"))] | length")
-              [ "${live:-0}" -eq 0 ] || continue
+                  | select((.display_title | startswith(\"Working (Implement)\")) and ((.display_title | endswith(\"(#${issue})\")) or (.display_title | endswith(\": #${issue}\"))))
+                ] | length" 2>/dev/null || echo 1)
+              [ "${live:-1}" -eq 0 ] || continue
 
-              has_pr=$(gh pr list --repo "$REPO" --state open --json body \
-                --jq "[.[] | select((.body // \"\") | ascii_downcase | test(\"clos(e|es|ed) #${issue}\\b|fix(es|ed)? #${issue}\\b|resolves? #${issue}\\b\"))] | length")
-              [ "${has_pr:-0}" -eq 0 ] || continue
+              # GITHUB_OUTPUT is set inside a step and the script appends there when it is,
+              # so it has to be pointed at stdout to be read here. Otherwise this captures
+              # nothing and quietly writes three keys into the job's own outputs.
+              linked_pr=$(GITHUB_OUTPUT=/dev/stdout GH_TOKEN="$GH_TOKEN" REPO="$REPO" ISSUE_NUMBER="$issue" \
+                BOT_LOGIN="agentic-loop-canary[bot]" \
+                bash ./.github/actions/resolve-change-linkage/resolve-change-linkage.sh 2>/dev/null |
+                sed -n 's/^pr=//p' | head -1)
+              if [ -n "${linked_pr:-}" ]; then
+                state=$(gh pr view "$linked_pr" --repo "$REPO" --json state --jq .state 2>/dev/null || echo UNKNOWN)
+                # UNKNOWN as well as OPEN: a reservation is only cleared on an answer, never on
+                # a failed lookup. The cost of keeping one is a delay; the cost of clearing a
+                # live one is a second agent on work that is already done.
+                [ "$state" = "MERGED" ] || [ "$state" = "CLOSED" ] || continue
+              fi
 
-              echo "Clearing a stale bot-working reservation on #$issue: no run, no pull request."
+              echo "Clearing a stale bot-working reservation on #$issue: no implement run, no open pull request."
               gh issue edit "$issue" --repo "$REPO" --remove-label bot-working
             done
 
