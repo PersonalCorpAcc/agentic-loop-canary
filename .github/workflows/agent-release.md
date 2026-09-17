@@ -1,5 +1,5 @@
 ---
-# Managed by @plainconceptsplatform/workflows@0.5.1. Source: loops/workflows/agent-release.md. Profile digest: c6b36da330d1. Update with `workflows update --force`; consumer edits may be overwritten.
+# Managed by @plainconceptsplatform/workflows@0.5.1. Source: loops/workflows/agent-release.md. Profile digest: 2a25c134fca6. Update with `workflows update --force`; consumer edits may be overwritten.
 env:
   GIT_AUTHOR_NAME: "github-actions[bot]"
   GIT_AUTHOR_EMAIL: "github-actions[bot]@users.noreply.github.com"
@@ -36,7 +36,7 @@ runs-on-slim: ubuntu-latest
 
 engine:
   id: claude
-model: claude-opus-5
+model: claude-haiku-4-5
 
 max-turns: 100
 max-turn-cache-misses: 3000

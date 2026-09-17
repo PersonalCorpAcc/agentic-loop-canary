@@ -1,5 +1,5 @@
 ---
-# Managed by @plainconceptsplatform/workflows@0.5.1. Source: loops/workflows/agent-implement.md. Profile digest: c6b36da330d1. Update with `workflows update --force`; consumer edits may be overwritten.
+# Managed by @plainconceptsplatform/workflows@0.5.1. Source: loops/workflows/agent-implement.md. Profile digest: 2a25c134fca6. Update with `workflows update --force`; consumer edits may be overwritten.
 env:
   VERIFY_COMMANDS: "go build ./... && go test ./..."
   REPO_RULES: "Run gofmt over anything you change; a build that fails only on formatting wastes a whole run."
@@ -119,6 +119,7 @@ jobs:
       issues: write
     outputs:
       base_tip: ${{ steps.base_tip.outputs.sha }}
+      branch_point_tip: ${{ steps.branch_point_tip.outputs.sha }}
     steps:
       - name: Checkout workflow actions
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -151,6 +152,19 @@ jobs:
           sha="$(gh api "repos/${REPO}/commits/${BASE_BRANCH}" --jq '.sha' 2>/dev/null || true)"
           echo "sha=${sha}" >> "$GITHUB_OUTPUT"
           echo "Base branch ${BASE_BRANCH} is at ${sha:-<unknown>} before this run's agent starts."
+      # The commit the agent is told to cut from, read before it starts and checked against
+      # the head afterwards (FR-061). This is the positive form of the base-rewrite check:
+      # a head that does not contain this commit was not cut where this loop cuts branches.
+      - name: Record the branch point's tip
+        id: branch_point_tip
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+          sha="$(gh api "repos/${REPO}/commits/${BRANCH_POINT}" --jq '.sha' 2>/dev/null || true)"
+          echo "sha=${sha}" >> "$GITHUB_OUTPUT"
+          echo "Branch point ${BRANCH_POINT} is at ${sha:-<unknown>} before this run's agent starts."
       - name: Mark the selected issue as in progress
         uses: ./.github/actions/add-issue-labels
         with:
@@ -202,6 +216,7 @@ jobs:
           token: ${{ steps.app-token.outputs.token }}
           pr-number: ${{ needs.safe_outputs.outputs.created_pr_number }}
           base-tip: ${{ needs.reserve.outputs.base_tip }}
+          branch-point-tip: ${{ needs.reserve.outputs.branch_point_tip }}
       - name: Hand the issue to a human when the pull request is wrong
         if: failure() && needs.safe_outputs.outputs.created_pr_number != ''
         uses: ./.github/actions/add-issue-labels
@@ -414,7 +429,7 @@ runs-on-slim: ubuntu-latest
 
 engine:
   id: claude
-model: claude-opus-5
+model: claude-sonnet-5
 
 max-turns: 3000
 max-turn-cache-misses: 3000
@@ -472,7 +487,7 @@ safe-outputs:
     # The unique component FR-052 requires, in the framework's only compile-time naming
     # hook. `preserve-branch-name` keeps whatever the agent chose, so without this a
     # re-implement of the same issue collides with the branch the first one left behind.
-    branch-prefix: "agent/${{ inputs.issue-number }}-${{ github.run_id }}-"
+    branch-prefix: "agent/${{ inputs.issue-number }}-${{ github.run_id }}/"
   push-to-pull-request-branch:
     target: "*"
     required-title-prefix: "[bot] "

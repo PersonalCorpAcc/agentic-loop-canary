@@ -1,5 +1,5 @@
 ---
-# Managed by @plainconceptsplatform/workflows@0.5.1. Source: loops/workflows/agent-refine.md. Profile digest: c6b36da330d1. Update with `workflows update --force`; consumer edits may be overwritten.
+# Managed by @plainconceptsplatform/workflows@0.5.1. Source: loops/workflows/agent-refine.md. Profile digest: 2a25c134fca6. Update with `workflows update --force`; consumer edits may be overwritten.
 env:
   REPO_RULES: "Run gofmt over anything you change; a build that fails only on formatting wastes a whole run."
   PLAN_EXPLORE_SKILL: plan-explore
@@ -362,7 +362,7 @@ runs-on-slim: ubuntu-latest
 
 engine:
   id: claude
-model: claude-opus-5
+model: claude-sonnet-5
 max-turns: 500
 max-turn-cache-misses: 4000
 max-ai-credits: 8000

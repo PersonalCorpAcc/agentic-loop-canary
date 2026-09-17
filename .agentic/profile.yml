@@ -19,16 +19,21 @@ runners:
 # route died at the credential; that was the last thing standing between here and a real
 # cycle.
 #
-# `models` overrides the model for one route. Triage and the merge gate are short, frequent
-# and structured, so they run on a cheaper model; implement and apply-review write code and
-# do not.
+# Sonnet 5 is the default rather than Opus 5. The first real run cost $1.20 for a
+# hello-world, almost all of it cache reads, and the canary exists to prove the cycle rather
+# than the model. Opus 5 is $5/$25 per MTok, Sonnet 5 $2/$10, Haiku 4.5 $1/$5, so this is
+# roughly 60% off and the routes that write and review code keep a strong model.
+#
+# `models` overrides the model for one route (FR-077). Triage applies labels and release
+# bumps a version: both are short and structured, and neither writes or reviews code. The
+# merge gate is not on that list -- it reads a diff and decides whether it may land.
 llm:
   engine: claude
-  model: claude-opus-5
+  model: claude-sonnet-5
   secret: ANTHROPIC_API_KEY
   models:
     triage: claude-haiku-4-5
-    merge-gate: claude-haiku-4-5
+    release: claude-haiku-4-5
 
 # The App this loop acts as. `appLogin` must be the App's own bot login, which GitHub
 # derives from the App's name: an App named "Agentic Loop Canary" logs in as

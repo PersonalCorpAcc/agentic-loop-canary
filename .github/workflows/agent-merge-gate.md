@@ -1,5 +1,5 @@
 ---
-# Managed by @plainconceptsplatform/workflows@0.5.1. Source: loops/workflows/agent-merge-gate.md. Profile digest: c6b36da330d1. Update with `workflows update --force`; consumer edits may be overwritten.
+# Managed by @plainconceptsplatform/workflows@0.5.1. Source: loops/workflows/agent-merge-gate.md. Profile digest: 2a25c134fca6. Update with `workflows update --force`; consumer edits may be overwritten.
 env:
   VERIFY_COMMANDS: "go build ./... && go test ./..."
   REPO_RULES: "Run gofmt over anything you change; a build that fails only on formatting wastes a whole run."
@@ -630,7 +630,7 @@ runs-on-slim: ubuntu-latest
 
 engine:
   id: claude
-model: claude-haiku-4-5
+model: claude-sonnet-5
 
 max-turns: 300
 max-turn-cache-misses: 3000

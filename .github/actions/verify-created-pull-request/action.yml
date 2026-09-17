@@ -1,4 +1,4 @@
-# Managed by @plainconceptsplatform/workflows@0.5.1. Source: loops/actions/verify-created-pull-request/action.yml. Profile digest: c6b36da330d1. Update with workflows update --force; consumer edits may be overwritten.
+# Managed by @plainconceptsplatform/workflows@0.5.1. Source: loops/actions/verify-created-pull-request/action.yml. Profile digest: 2a25c134fca6. Update with workflows update --force; consumer edits may be overwritten.
 name: Verify created pull request
 description: >
   Check the pull request the framework created against what the profile asked for, and fail
@@ -10,6 +10,12 @@ inputs:
   pr-number:
     description: The pull request the run reported creating.
     required: true
+  branch-point-tip:
+    description: >-
+      The branch point's tip, read before the agent ran. The head must contain it: a head that
+      does not was cut somewhere this loop does not cut branches.
+    required: false
+    default: ''
   base-tip:
     description: >-
       The base branch's tip, read before the agent ran. Empty under a strategy whose base is
@@ -20,7 +26,7 @@ inputs:
   branch-pattern:
     description: Extended regular expression every branch this loop writes matches.
     required: false
-    default: '^agent/[0-9]+-[0-9]+-.+$'
+    default: '^agent/[0-9]+-[0-9]+/.+$'
 runs:
   using: composite
   steps:
@@ -31,5 +37,6 @@ runs:
         REPO: ${{ github.repository }}
         PR_NUMBER: ${{ inputs.pr-number }}
         BASE_TIP: ${{ inputs.base-tip }}
+        BRANCH_POINT_TIP: ${{ inputs.branch-point-tip }}
         BRANCH_PATTERN: ${{ inputs.branch-pattern }}
       run: bash "${GITHUB_ACTION_PATH}/verify-created-pull-request.sh"

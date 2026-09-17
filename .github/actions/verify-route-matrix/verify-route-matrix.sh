@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Managed by @plainconceptsplatform/workflows@0.5.1. Source: loops/actions/verify-route-matrix/verify-route-matrix.sh. Profile digest: c6b36da330d1. Update with `workflows update --force`; consumer edits may be overwritten.
+# Managed by @plainconceptsplatform/workflows@0.5.1. Source: loops/actions/verify-route-matrix/verify-route-matrix.sh. Profile digest: 2a25c134fca6. Update with `workflows update --force`; consumer edits may be overwritten.
 # Exercise the router's real classifier. This sources classify-route.sh rather than
 # restating it, so a change to the route table cannot pass here by being copied twice.
 #
@@ -1056,7 +1056,7 @@ done < <(sed -n '/^      operation:/,/^      issue-number:/p' "$ROUTER_YML" |
 #
 # A worker the repository did not select is skipped rather than failed -- which capabilities
 # are installed is a different question, asked elsewhere.
-readonly ROUTE_MODELS="agent-implement.md=claude-opus-5 agent-refine.md=claude-opus-5 agent-triage.md=claude-haiku-4-5 agent-apply-review.md=claude-opus-5 agent-merge-gate.md=claude-haiku-4-5 agent-audit.md=claude-opus-5 agent-release.md=claude-opus-5"
+readonly ROUTE_MODELS="agent-implement.md=claude-sonnet-5 agent-refine.md=claude-sonnet-5 agent-triage.md=claude-haiku-4-5 agent-apply-review.md=claude-sonnet-5 agent-merge-gate.md=claude-sonnet-5 agent-audit.md=claude-sonnet-5 agent-release.md=claude-haiku-4-5"
 
 for pair in $ROUTE_MODELS; do
   worker="${HERE}/../../workflows/${pair%%=*}"

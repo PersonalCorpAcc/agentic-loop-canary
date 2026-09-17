@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Managed by @plainconceptsplatform/workflows@0.5.1. Source: loops/actions/verify-created-pull-request/verify-created-pull-request.sh. Profile digest: c6b36da330d1. Update with `workflows update --force`; consumer edits may be overwritten.
+# Managed by @plainconceptsplatform/workflows@0.5.1. Source: loops/actions/verify-created-pull-request/verify-created-pull-request.sh. Profile digest: 2a25c134fca6. Update with `workflows update --force`; consumer edits may be overwritten.
 #
 # The pull request the framework says it made, checked against what it should be (FR-061).
 #
@@ -46,19 +46,30 @@ if [ -n "${BRANCH_PATTERN:-}" ] && ! printf '%s' "$head_branch" | grep -qE "${BR
   problems+=("its head branch '${head_branch}' does not match the template this loop names branches with ('${BRANCH_PATTERN}')")
 fi
 
-# 3. The base rewrite. The agent works from the branch point and the pull request opens
-#    against the first stage, so under a chain the head descends from the branch point and
-#    the base tip is *not* one of its ancestors. If it is, the framework recreated the
-#    branch at the base and replayed the agent's files over it, which silently reverts
-#    everything the base had and the agent never saw (research R11).
-if [ -n "${BASE_TIP:-}" ]; then
-  status="$(gh api "repos/${REPO}/compare/${BASE_TIP}...${head_sha}" --jq '.status' 2>/dev/null || echo unknown)"
+# 3. The base rewrite. The fault is the framework recreating the branch at the *base* and
+#    replaying the agent's files over it, which silently reverts everything the base had and
+#    the agent never saw (research R11). The question that detects it is "was this branch
+#    built on the commit we told the agent to cut from", and it is asked directly: the branch
+#    point's tip is recorded before the agent runs and must be an ancestor of the head.
+#
+#    It used to be asked the other way round -- fail if the *base* tip is an ancestor of the
+#    head -- on the reasoning that under a chain the head descends from the branch point and
+#    so cannot descend from the base. That reasoning does not survive contact with a chain in
+#    its ordinary state: `dev` is normally behind `main`, work is cut from `main`, and an
+#    ancestor of `main` is an ancestor of everything cut from it. The check therefore failed
+#    every correct run. The canary proved it on 17/09/2026 -- head 1edaf4f's parent was
+#    main's tip, exactly where the profile says to cut, and the pull request was refused.
+if [ -n "${BRANCH_POINT_TIP:-}" ]; then
+  status="$(gh api "repos/${REPO}/compare/${BRANCH_POINT_TIP}...${head_sha}" --jq '.status' 2>/dev/null || echo unknown)"
   case "$status" in
     ahead | identical)
-      problems+=("the base tip recorded before the agent ran (${BASE_TIP}) is an ancestor of the head (${head_sha}): the branch was recreated at the base and the agent's files replayed over it, which reverts the base")
+      : # The head contains the branch point, which is the shape a correct run produces.
       ;;
     unknown)
-      echo "::warning::Could not compare ${BASE_TIP} with ${head_sha}, so a base rewrite cannot be ruled out for #${PR_NUMBER}."
+      echo "::warning::Could not compare ${BRANCH_POINT_TIP} with ${head_sha}, so a base rewrite cannot be ruled out for #${PR_NUMBER}."
+      ;;
+    *)
+      problems+=("the branch point recorded before the agent ran (${BRANCH_POINT_TIP}) is not an ancestor of the head (${head_sha}): this branch was not cut where this loop cuts branches, which is what a branch recreated at the base looks like")
       ;;
   esac
 fi

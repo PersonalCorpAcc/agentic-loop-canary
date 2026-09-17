@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Managed by @plainconceptsplatform/workflows@0.5.1. Source: loops/actions/classify-route/classify-route.sh. Profile digest: c6b36da330d1. Update with `workflows update --force`; consumer edits may be overwritten.
+# Managed by @plainconceptsplatform/workflows@0.5.1. Source: loops/actions/classify-route/classify-route.sh. Profile digest: 2a25c134fca6. Update with `workflows update --force`; consumer edits may be overwritten.
 # Classify one GitHub event into exactly one route. Pure: no network, no gh calls, so
 # verify-route-matrix.sh can source this file and exercise the same code the router runs.
 #

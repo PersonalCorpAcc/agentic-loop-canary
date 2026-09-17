@@ -1,5 +1,5 @@
 ---
-# Managed by @plainconceptsplatform/workflows@0.5.1. Source: loops/workflows/agent-apply-review.md. Profile digest: c6b36da330d1. Update with `workflows update --force`; consumer edits may be overwritten.
+# Managed by @plainconceptsplatform/workflows@0.5.1. Source: loops/workflows/agent-apply-review.md. Profile digest: 2a25c134fca6. Update with `workflows update --force`; consumer edits may be overwritten.
 env:
   # Printed by the prompt as the verification block. Consumers set their own commands.
   VERIFY_COMMANDS: "go build ./... && go test ./..."
@@ -310,7 +310,7 @@ runs-on-slim: ubuntu-latest
 
 engine:
   id: claude
-model: claude-opus-5
+model: claude-sonnet-5
 
 max-turns: 300
 max-turn-cache-misses: 3000

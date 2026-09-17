@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Managed by @plainconceptsplatform/workflows@0.5.1. Source: loops/actions/guard-branch-write/guard-branch-write.sh. Profile digest: c6b36da330d1. Update with `workflows update --force`; consumer edits may be overwritten.
+# Managed by @plainconceptsplatform/workflows@0.5.1. Source: loops/actions/guard-branch-write/guard-branch-write.sh. Profile digest: 2a25c134fca6. Update with `workflows update --force`; consumer edits may be overwritten.
 #
 # May this job write this branch? (FR-063)
 #
