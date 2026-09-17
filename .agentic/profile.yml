@@ -93,12 +93,6 @@ changelog:
   path: CHANGELOG.json
 
 ci:
-  # A token whose events start workflow runs. GitHub does not start them for events
-  # raised by GITHUB_TOKEN, so the pull request the handler opens gets no check run at
-  # all: the merge gate has no verdict to read, and reconcile-bot-pr-runs hands the
-  # pull request to a person after 45 minutes, which is the escape hatch rather than
-  # the cycle (FR-069).
-  triggerSecret: GH_AW_CI_TRIGGER_TOKEN
   template: app-ci-go
   workflowName: CI
 

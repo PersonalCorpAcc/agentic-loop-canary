@@ -1,5 +1,5 @@
 ---
-# Managed by @plainconceptsplatform/workflows@0.5.1. Source: loops/workflows/agent-implement.md. Profile digest: 7da3f578364e. Update with `workflows update --force`; consumer edits may be overwritten.
+# Managed by @plainconceptsplatform/workflows@0.5.1. Source: loops/workflows/agent-implement.md. Profile digest: 588652f49de4. Update with `workflows update --force`; consumer edits may be overwritten.
 env:
   VERIFY_COMMANDS: "go build ./... && go test ./..."
   REPO_RULES: "Run gofmt over anything you change; a build that fails only on formatting wastes a whole run."

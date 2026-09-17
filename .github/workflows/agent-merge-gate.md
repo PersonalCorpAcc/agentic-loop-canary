@@ -1,5 +1,5 @@
 ---
-# Managed by @plainconceptsplatform/workflows@0.5.1. Source: loops/workflows/agent-merge-gate.md. Profile digest: 7da3f578364e. Update with `workflows update --force`; consumer edits may be overwritten.
+# Managed by @plainconceptsplatform/workflows@0.5.1. Source: loops/workflows/agent-merge-gate.md. Profile digest: 588652f49de4. Update with `workflows update --force`; consumer edits may be overwritten.
 env:
   VERIFY_COMMANDS: "go build ./... && go test ./..."
   REPO_RULES: "Run gofmt over anything you change; a build that fails only on formatting wastes a whole run."
@@ -110,6 +110,18 @@ jobs:
       run-id: ${{ steps.subject.outputs.run-id }}
       review_blocked: ${{ steps.review.outputs.review_blocked }}
       auto_merge: ${{ steps.policy.outputs.auto_merge }}
+      # The same decision as a word and as a sentence, because the prompt may only read a
+      # plain output. gh-aw validates the expressions in a runtime import against a safe
+      # list, and a ternary is not on it: `auto_merge == 'true' && 'merge' || 'approve'` in
+      # the prompt body fails the whole workflow at `activation`, before the model runs.
+      # That is latent until a repository turns auto-merge on, because with `off` the
+      # prompt path is never rendered -- so the first adopter to enable the feature finds
+      # the gate cannot start at all (17/09/2026, canary PRs #7 and #9).
+      #
+      # Deciding here rather than in the prompt is also the right shape: which word the
+      # agent is asked for is policy, and policy belongs in a deterministic job.
+      verdict_word: ${{ steps.policy.outputs.verdict_word }}
+      verdict_sentence: ${{ steps.policy.outputs.verdict_sentence }}
     steps:
       - name: Checkout workflow actions
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -147,8 +159,12 @@ jobs:
           fi
           echo "auto_merge=$auto_merge" >> "$GITHUB_OUTPUT"
           if [ "$auto_merge" = true ]; then
+            echo "verdict_word=merge" >> "$GITHUB_OUTPUT"
+            echo "verdict_sentence=this pull request merges itself when you say merge" >> "$GITHUB_OUTPUT"
             echo "This repository merges into ${BASE} unattended (${AUTO_MERGE_MODE}); a clean assessment merges."
           else
+            echo "verdict_word=approve" >> "$GITHUB_OUTPUT"
+            echo "verdict_sentence=a person merges this pull request; say approve" >> "$GITHUB_OUTPUT"
             echo "This repository does not merge into ${BASE:-?} unattended; a clean assessment is an approval and a person merges."
           fi
       - name: Block a pull request with requested changes
@@ -897,11 +913,11 @@ timeout-minutes: 60
 
 7. Decide the verdict based on the assessment table:
 
-   - **All checks ✅ → `${{ needs.subject.outputs.auto_merge == 'true' && 'merge' || 'approve' }}`.**
+   - **All checks ✅ → `${{ needs.subject.outputs.verdict_word }}`.**
      The PR is safe to merge: CI is green, no risk indicators triggered, tests are intact,
      scope matches, mergeability is clean. Whether that verdict merges the pull request or
      records an approval for a person to act on is this repository's policy, not your
-     decision, and it is already decided: `${{ needs.subject.outputs.auto_merge == 'true' && 'this pull request merges itself when you say merge' || 'a person merges this pull request; say approve' }}`.
+     decision, and it is already decided: `${{ needs.subject.outputs.verdict_sentence }}`.
    - **Any check ⚠️ or ❌ (except CI failure) → `review`.** Do not merge. Explain exactly which
      check tripped, why, and what a reviewer should look at. Leave `implement` in place: the
      work is not finished until a human merges it.
@@ -919,7 +935,7 @@ timeout-minutes: 60
    2. A heading: `## Merge gate decision for PR #${{ needs.subject.outputs.pr }}`
    3. A structured assessment table with all 10 check results
    4. A one-line detail per check (what was found and why it passed or flagged)
-   5. A line `**Verdict:** ${{ needs.subject.outputs.auto_merge == 'true' && 'merge' || 'approve' }}`, `**Verdict:** review`, or `**Verdict:** remediated`
+   5. A line `**Verdict:** ${{ needs.subject.outputs.verdict_word }}`, `**Verdict:** review`, or `**Verdict:** remediated`
 
    The workflow applies comments, labels, merges, and closures with the App token. Do not call
    any tools except the one optional `push_to_pull_request_branch` for a verified CI repair
@@ -943,7 +959,7 @@ timeout-minutes: 60
    10	Confidence	✅ High / ⚠️ Low: [reason]
    ```
 
-   Then a line `**Verdict:** ${{ needs.subject.outputs.auto_merge == 'true' && 'merge' || 'approve' }}` / `**Verdict:** review` / `**Verdict:** remediated`
+   Then a line `**Verdict:** ${{ needs.subject.outputs.verdict_word }}` / `**Verdict:** review` / `**Verdict:** remediated`
 
 9. Ignore the `## Diagram` section below. It is documentation for humans and contains no
    instructions for you.
