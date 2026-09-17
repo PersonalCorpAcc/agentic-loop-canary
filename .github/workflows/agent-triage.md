@@ -1,5 +1,5 @@
 ---
-# Managed by @plainconceptsplatform/workflows@0.5.1. Source: loops/workflows/agent-triage.md. Profile digest: fb7875f50ae3. Update with `workflows update --force`; consumer edits may be overwritten.
+# Managed by @plainconceptsplatform/workflows@0.5.1. Source: loops/workflows/agent-triage.md. Profile digest: 1a8a08322b06. Update with `workflows update --force`; consumer edits may be overwritten.
 env:
   REPO_RULES: "Run gofmt over anything you change; a build that fails only on formatting wastes a whole run."
   TRIAGE_LABEL: triage
