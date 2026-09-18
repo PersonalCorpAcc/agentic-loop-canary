@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Managed by @plainconceptsplatform/workflows@0.5.1. Source: loops/actions/check-merge-preconditions/check-merge-preconditions.sh. Profile digest: 1a8a08322b06. Update with `workflows update --force`; consumer edits may be overwritten.
+# Managed by @plainconceptsplatform/workflows@0.5.1. Source: loops/actions/check-merge-preconditions/check-merge-preconditions.sh. Profile digest: 76d2155c1f82. Update with `workflows update --force`; consumer edits may be overwritten.
 #
 # What the forge says about this pull request before anything tries to merge it (FR-068).
 #
@@ -8,8 +8,20 @@
 # state is read first, and a refusal becomes a review with a sentence rather than an attempt
 # with a stack trace.
 #
-# Writes `mergeable=` and `reason=` to $GITHUB_OUTPUT. The caller decides what to do with a
-# false, because the gate and the output applier label different things.
+# Writes `mergeable=`, `deferrable=` and `refusal=` to $GITHUB_OUTPUT. The caller decides
+# what to do with a false, because the gate and the output applier label different things.
+#
+# `deferrable` is the third answer, and it exists because `BLOCKED` is not a refusal aimed at
+# us (FR-080). The merge state is a property of the pull request against its base, not of the
+# caller asking: a repository rule holding a pull request reports `BLOCKED` to everybody,
+# including an actor the ruleset would let through, and there is no caller-aware read to ask
+# instead -- `GET /repos/{owner}/{repo}/rules/branches/{branch}` returns the same rules to a
+# bypassing App, to the workflow token and to an administrator (D8, 18/09/2026). So `BLOCKED`
+# means "a rule is holding this, and the rule may yet be satisfied": the caller arms
+# auto-merge and GitHub performs the merge when the required review or check arrives, which
+# is GitHub's own documented pattern for a bot landing its own pull requests (D9). Everything
+# else stays a refusal, because every other state is a fact about the pull request rather
+# than about a rule somebody may satisfy.
 
 set -euo pipefail
 
@@ -35,9 +47,21 @@ esac
 refuse() {
   {
     echo "mergeable=false"
+    echo "deferrable=false"
     echo "refusal=$1"
   } >>"${GITHUB_OUTPUT:-/dev/stdout}"
   echo "PR #${PR_NUMBER} will not be merged: $1"
+  exit 0
+}
+
+# Not now, but not a refusal either: a rule is holding it and the rule can still be satisfied.
+defer() {
+  {
+    echo "mergeable=false"
+    echo "deferrable=true"
+    echo "refusal=$1"
+  } >>"${GITHUB_OUTPUT:-/dev/stdout}"
+  echo "PR #${PR_NUMBER} is not mergeable yet: $1"
   exit 0
 }
 
@@ -60,7 +84,10 @@ case "$state" in
     refuse "it is a draft, and the forge refuses to merge one."
     ;;
   BLOCKED)
-    refuse "branch protection is not satisfied: a required check or a required review is missing. The gate merges what protection allows and never past it."
+    # The wording matters: this is what a person reads on the pull request, and "the gate
+    # refused" would be untrue. A required review that a person has not given yet is the
+    # repository working as its owner configured it.
+    defer "a repository rule is holding it -- a required review or a required check is outstanding. The gate marks it ready and the forge merges it when the rule is satisfied; it is never merged past a rule."
     ;;
   BEHIND)
     refuse "the base has moved and this repository requires branches to be up to date. Under a chain every branch is structurally behind its base and nothing here rebases to catch up, so that setting belongs off on the stages."
@@ -81,6 +108,7 @@ fi
 
 {
   echo "mergeable=true"
+  echo "deferrable=false"
   echo "refusal="
 } >>"${GITHUB_OUTPUT:-/dev/stdout}"
 echo "PR #${PR_NUMBER} may be merged: the forge reports ${state}."
