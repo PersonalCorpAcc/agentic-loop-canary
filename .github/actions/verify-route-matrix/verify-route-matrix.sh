@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Managed by @plainconceptsplatform/workflows@0.5.1. Source: loops/actions/verify-route-matrix/verify-route-matrix.sh. Profile digest: 1a8a08322b06. Update with `workflows update --force`; consumer edits may be overwritten.
+# Managed by @plainconceptsplatform/workflows@0.5.1. Source: loops/actions/verify-route-matrix/verify-route-matrix.sh. Profile digest: 76d2155c1f82. Update with `workflows update --force`; consumer edits may be overwritten.
 # Exercise the router's real classifier. This sources classify-route.sh rather than
 # restating it, so a change to the route table cannot pass here by being copied twice.
 #
@@ -273,6 +273,7 @@ if [ ! -f "$MERGE_GATE_WORKER_MD" ]; then
 else
   # Every step that merges, or takes a step towards merging, asks the policy first.
   for step in "Merge approved pull request" "Check the forge will take the merge" \
+    "Arm auto-merge when a rule is holding it" \
     "Refuse a rebase merge whose commits close the issue"; do
     # -e, because a pattern that starts with a dash is read as an option and the error
     # ("unknown option") does not mention the pattern at all.
@@ -306,6 +307,20 @@ else
       { GATE_POLICY_OK=0; echo "FAIL: the merge-gate validator does not accept an approve verdict, so a gate that may not merge has no verdict to give" >&2; }
   fi
 fi
+  # A rule holding a pull request is not a refusal aimed at us, and the loop must neither
+  # merge past it nor treat it as the end of the road (FR-080). The forge reports `BLOCKED`
+  # to every caller, including one a ruleset would let through, so the gate arms auto-merge
+  # and the merge happens when the rule is satisfied.
+  grep -qF -e "- name: Arm auto-merge when a rule is holding it" "$MERGE_GATE_WORKER_MD" ||
+    { GATE_POLICY_OK=0; echo "FAIL: the merge gate has no arming step, so a protected repository would hand every bot pull request to a person" >&2; }
+  grep -q -- '--auto' "$MERGE_GATE_WORKER_MD" ||
+    { GATE_POLICY_OK=0; echo "FAIL: the merge gate never arms auto-merge; the deferred path is what merges a pull request a rule is holding" >&2; }
+  # And it must not ask to be exempted from the rules it is waiting on.
+  if grep -qiE 'bypass_actors|bypass_mode' "$MERGE_GATE_WORKER_MD"; then
+    GATE_POLICY_OK=0
+    echo "FAIL: the merge gate references a ruleset bypass; this loop merges what the rules allow and never past them" >&2
+  fi
+
 if [ "$GATE_POLICY_OK" -eq 1 ]; then PASS=$((PASS + 1)); else FAIL=$((FAIL + 1)); fi
 
 echo "── Every scheduled route, both ends (research R7) ────────────────────────"
@@ -322,14 +337,25 @@ mapfile -t ROUTER_CRONS < <(
   tr -d '\r' <"$ROUTER_YML" | sed -n '/^  schedule:/,/^  [a-z_]*:/p' |
     sed -n 's/^    - cron: "\(.*\)".*/\1/p'
 )
-[ "${#ROUTER_CRONS[@]}" -gt 0 ] ||
-  { SCHEDULE_OK=0; echo "FAIL: the router has no schedule at all, so nothing this loop does on a clock happens" >&2; }
+# A repository with no schedule is a repository whose profile switched every clock off,
+# which is a supported answer and not a broken install (FR-081). What must hold either way is
+# that the two files agree: a schedule with no constant behind it fires into nothing, and a
+# constant with no schedule in front of it says a route runs on a clock that was never
+# started. The second is checked below; this is the first.
+if [ "${#ROUTER_CRONS[@]}" -eq 0 ]; then
+  for name in AUDIT_CRON AUDIT_CLOSE_CRON CLEANUP_ARTIFACTS_CRON RECONCILE_BOT_PR_RUNS_CRON PROMOTE_CRON SYNC_STAGES_CRON; do
+    if declare -p "$name" >/dev/null 2>&1 && [ -n "${!name}" ]; then
+      SCHEDULE_OK=0
+      echo "FAIL: the router runs on no schedule at all, but the classifier still carries ${name}='${!name}'; one of the two files was written from a different profile" >&2
+    fi
+  done
+fi
 
 for cron in "${ROUTER_CRONS[@]}"; do
   # The classifier is already sourced, so its constants are this shell's. A cron the router
   # fires must be one of them, and must reach a route.
   answered=""
-  for name in AUDIT_CRON AUDIT_CLOSE_CRON CLEANUP_ARTIFACTS_CRON RECONCILE_BOT_PR_RUNS_CRON PROMOTE_CRON; do
+  for name in AUDIT_CRON AUDIT_CLOSE_CRON CLEANUP_ARTIFACTS_CRON RECONCILE_BOT_PR_RUNS_CRON PROMOTE_CRON SYNC_STAGES_CRON; do
     declare -p "$name" >/dev/null 2>&1 || continue
     [ "${!name}" = "$cron" ] || continue
     answered="$name"
@@ -349,7 +375,7 @@ done
 
 # And the other way: a constant the classifier answers to that no schedule fires is a route
 # that can only be reached by hand, which is not what a cron constant says it is.
-for name in AUDIT_CRON AUDIT_CLOSE_CRON CLEANUP_ARTIFACTS_CRON RECONCILE_BOT_PR_RUNS_CRON PROMOTE_CRON; do
+for name in AUDIT_CRON AUDIT_CLOSE_CRON CLEANUP_ARTIFACTS_CRON RECONCILE_BOT_PR_RUNS_CRON PROMOTE_CRON SYNC_STAGES_CRON; do
   declare -p "$name" >/dev/null 2>&1 || continue
   value="${!name}"
   [ -n "$value" ] || continue
@@ -550,6 +576,12 @@ if [ "$STRATEGY_OK" -eq 1 ]; then
       # nothing can reach it, which is the cron above and the dispatch below.
       assert_route "a promote dispatch under trunk routes nowhere" none \
         EVENT=workflow_dispatch OPERATION=promote
+      if declare -p SYNC_STAGES_CRON >/dev/null 2>&1; then
+        STRATEGY_OK=0
+        echo "FAIL: trunk carries a sync-stages cron; with one branch there is no stage that can fall behind another" >&2
+      fi
+      assert_route "a sync-stages dispatch under trunk routes nowhere" none \
+        EVENT=workflow_dispatch OPERATION=sync-stages
       ;;
     branch-chain)
       # A chain, a promotion schedule, and a deterministic job named `promote`, never
@@ -563,8 +595,11 @@ if [ "$STRATEGY_OK" -eq 1 ]; then
       done
       [ "$closing_is_a_stage" -eq 1 ] ||
         { STRATEGY_OK=0; echo "FAIL: issues close on '${CLOSE_ISSUE_ON}', which is not one of the chain's stages" >&2; }
-      declare -p PROMOTE_CRON >/dev/null 2>&1 ||
-        { STRATEGY_OK=0; echo "FAIL: branch-chain carries no promote cron, so nothing would ever advance a change through the chain" >&2; }
+      # No assertion that the promotion clock exists: a chain repository may run promotion by
+      # dispatch alone, which is what the canary did while it was being proven and what
+      # `crons.promote: off` now expresses as a profile value rather than a local edit
+      # (FR-081). What is asserted is that the route is reachable, below, and that a clock
+      # which does exist routes to it.
       if grep -q '^  call-promote:' "$ROUTER_YML"; then
         STRATEGY_OK=0
         echo "FAIL: the promote job is named call-promote; that prefix is reserved for worker callers and the metrics match on it" >&2
@@ -589,6 +624,42 @@ if [ "$STRATEGY_OK" -eq 1 ]; then
       if declare -p PROMOTE_CRON >/dev/null 2>&1; then
         assert_route "the promote cron routes to promote" promote \
           EVENT=schedule "SCHEDULE=${PROMOTE_CRON}"
+      fi
+      # The chain's other direction. A stage that falls behind is invisible until a pull
+      # request into it carries the whole delta, trips the protected-files rule and skips
+      # the model, so the route that carries content back down is not optional equipment on
+      # a chain (FR-079).
+      # Likewise the back-propagation clock. `doctor`'s stage-alignment check answers the same
+      # question from a working copy, so a repository that dispatches it by hand is not blind
+      # to a stage falling behind.
+      grep -q '^  sync-stages:$' "$ROUTER_YML" ||
+        { STRATEGY_OK=0; echo "FAIL: work-router.yml has no sync-stages job" >&2; }
+      SYNC_SCRIPT="${HERE}/../sync-stages/sync-stages.sh"
+      if [ ! -f "$SYNC_SCRIPT" ]; then
+        STRATEGY_OK=0
+        echo "FAIL: this repository promotes along a chain but the sync-stages action is not installed" >&2
+      else
+        # The whole route turns on comparing by content: under a rebase promotion every
+        # change that went up the chain has a different sha on each stage, so a sha
+        # comparison would report all of them missing and carry the chain back down on its
+        # first run.
+        grep -q 'git patch-id --stable' "$SYNC_SCRIPT" ||
+          { STRATEGY_OK=0; echo "FAIL: the sync-stages route does not compare by patch-id, so it cannot tell a stage that is behind from one that rebased" >&2; }
+        grep -q 'gh pr create' "$SYNC_SCRIPT" ||
+          { STRATEGY_OK=0; echo "FAIL: the sync-stages route does not open a pull request; a stage may only be written through one" >&2; }
+        # Every push it makes is to its own `sync/` head. A push that named a stage would be
+        # this route writing a protected branch directly, which is the one thing its design
+        # rules out.
+        if grep -E '^\s*git push' "$SYNC_SCRIPT" | grep -qvE 'refs/heads/\$\{sync_branch\}'; then
+          STRATEGY_OK=0
+          echo "FAIL: the sync-stages route pushes something other than its own sync branch; back-propagation goes through a pull request so it gets CI and the gate" >&2
+        fi
+      fi
+      assert_route "a sync-stages dispatch routes to sync-stages" sync-stages \
+        EVENT=workflow_dispatch OPERATION=sync-stages
+      if declare -p SYNC_STAGES_CRON >/dev/null 2>&1; then
+        assert_route "the sync-stages cron routes to sync-stages" sync-stages \
+          EVENT=schedule "SCHEDULE=${SYNC_STAGES_CRON}"
       fi
       ;;
     release-branch | env-promotion)
@@ -664,8 +735,9 @@ if [ "$STRATEGY_OK" -eq 1 ]; then PASS=$((PASS + 1)); else FAIL=$((FAIL + 1)); f
 # promote and stage-merge are deterministic router jobs, not workers, so the worker rule below
 # does not reach them, and they read projected branching values. A name a step prints that the
 # job does not define renders empty, and a promotion into "" is what that buys.
+# sync-stages is the third of them (FR-079).
 JOB_ENV_OK=1
-for job in promote stage-merge; do
+for job in promote stage-merge sync-stages; do
   job_block="$(tr -d '\r' <"$ROUTER_YML" | sed -n "/^  ${job}:\$/,/^  [a-z][a-z0-9-]*:\$/p")"
   [ -n "$job_block" ] || continue
   while read -r name; do

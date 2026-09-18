@@ -1,5 +1,5 @@
 ---
-# Managed by @plainconceptsplatform/workflows@0.5.1. Source: loops/workflows/agent-merge-gate.md. Profile digest: 1a8a08322b06. Update with `workflows update --force`; consumer edits may be overwritten.
+# Managed by @plainconceptsplatform/workflows@0.5.1. Source: loops/workflows/agent-merge-gate.md. Profile digest: 76d2155c1f82. Update with `workflows update --force`; consumer edits may be overwritten.
 env:
   VERIFY_COMMANDS: "go build ./... && go test ./..."
   REPO_RULES: "Run gofmt over anything you change; a build that fails only on formatting wastes a whole run."
@@ -493,18 +493,63 @@ jobs:
           set -euo pipefail
           head_sha=$(gh pr view "$PR" --repo "$REPO" --json headRefOid --jq '.headRefOid')
           gh pr merge "$PR" --repo "$REPO" "--${MERGE_METHOD}" --match-head-commit "$head_sha"
+      # A rule is holding it, and a rule can still be satisfied (FR-080). This is the case
+      # protection produces on every pull request into a branch whose owner wants a person on
+      # it, so it must not read as a failure: the gate marks the pull request ready and the
+      # forge merges it when the required review or check arrives. That is GitHub's own
+      # documented pattern for a bot landing its own pull requests, and it is the reason this
+      # loop needs no bypass permission -- with one, the pull request would still report
+      # `BLOCKED` and we would be merging past the adopter's own rules, which is the opposite
+      # of what turning protection on asks for (D8, D9).
+      #
+      # No label moves and nothing is cleared, exactly as an approval moves nothing: the
+      # change has not landed, the issue is still reserved, and `pr-pending` is still true.
+      - name: Arm auto-merge when a rule is holding it
+        id: arm
+        if: needs.validate_output.outputs.outcome == 'merge' && needs.subject.outputs.auto_merge == 'true' && steps.preconditions.outputs.deferrable == 'true'
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+          REPO: ${{ github.repository }}
+          PR: ${{ needs.subject.outputs.pr }}
+          MERGE_METHOD: ${{ env.MERGE_METHOD }}
+          REFUSAL: ${{ steps.preconditions.outputs.refusal }}
+        run: |
+          set -euo pipefail
+          # The method is the profile's, chosen here rather than at merge time because with
+          # auto-merge the forge performs the merge later and takes the method now.
+          if armed="$(gh pr merge "$PR" --repo "$REPO" "--${MERGE_METHOD}" --auto 2>&1)"; then
+            echo "armed=true" >> "$GITHUB_OUTPUT"
+            gh pr comment "$PR" --repo "$REPO" --body "The merge gate found nothing to stop this pull request and has marked it ready: ${REFUSAL}
+
+            Nothing else is needed from the loop. Nothing about the issue has changed -- it is still reserved and still pending."
+            echo "PR #${PR}: auto-merge armed (${MERGE_METHOD}); waiting for the rule to be satisfied."
+          else
+            # The repository setting is off, which is its default. Said loudly and named,
+            # because the failure is otherwise a pull request that waits for ever with
+            # nothing anywhere saying why.
+            echo "armed=false" >> "$GITHUB_OUTPUT"
+            echo "::warning::PR #${PR}: auto-merge could not be armed. ${armed}"
+          fi
       - name: Hand the merge to a human when the forge refuses it
-        if: needs.validate_output.outputs.outcome == 'merge' && needs.subject.outputs.auto_merge == 'true' && steps.preconditions.outputs.mergeable != 'true'
+        if: needs.validate_output.outputs.outcome == 'merge' && needs.subject.outputs.auto_merge == 'true' && steps.preconditions.outputs.mergeable != 'true' && (steps.preconditions.outputs.deferrable != 'true' || steps.arm.outputs.armed != 'true')
         env:
           GH_TOKEN: ${{ steps.app-token.outputs.token }}
           REPO: ${{ github.repository }}
           PR: ${{ needs.subject.outputs.pr }}
           REFUSAL: ${{ steps.preconditions.outputs.refusal }}
+          ARMED: ${{ steps.arm.outputs.armed }}
+          DEFERRABLE: ${{ steps.preconditions.outputs.deferrable }}
         run: |
           set -euo pipefail
-          gh pr comment "$PR" --repo "$REPO" --body "The merge gate approved this pull request but did not merge it: ${REFUSAL}"
+          if [ "$DEFERRABLE" = "true" ] && [ "$ARMED" != "true" ]; then
+            gh pr comment "$PR" --repo "$REPO" --body "The merge gate approved this pull request but could not merge or queue it: ${REFUSAL}
+
+            It could not be marked ready either, because **Allow auto-merge** is switched off for this repository -- it is off by default. Turn it on in Settings, or merge this pull request by hand once the rule is satisfied."
+          else
+            gh pr comment "$PR" --repo "$REPO" --body "The merge gate approved this pull request but did not merge it: ${REFUSAL}"
+          fi
       - name: Flag the refused merge for review
-        if: needs.validate_output.outputs.outcome == 'merge' && needs.subject.outputs.auto_merge == 'true' && steps.preconditions.outputs.mergeable != 'true'
+        if: needs.validate_output.outputs.outcome == 'merge' && needs.subject.outputs.auto_merge == 'true' && steps.preconditions.outputs.mergeable != 'true' && (steps.preconditions.outputs.deferrable != 'true' || steps.arm.outputs.armed != 'true')
         uses: ./.github/actions/add-issue-labels
         with:
           token: ${{ steps.app-token.outputs.token }}
@@ -556,10 +601,10 @@ jobs:
         uses: ./.github/actions/record-outcome
         with:
           outcome: ${{ (needs.validate_output.outputs.outcome == 'merge' && needs.subject.outputs.auto_merge == 'true') && 'acted' || needs.validate_output.outputs.outcome == 'review' && 'handed-to-human' || needs.validate_output.outputs.outcome == 'invalid' && 'no-action' || 'acted' }}
-          reason: ${{ (needs.validate_output.outputs.outcome == 'merge' && needs.subject.outputs.auto_merge == 'true') && 'merged' || needs.validate_output.outputs.outcome == 'review' && 'review-requested' || needs.validate_output.outputs.outcome == 'remediated' && 'acted' || needs.validate_output.outputs.outcome == 'invalid' && 'nothing-to-sweep' || 'approved' }}
+          reason: ${{ steps.arm.outputs.armed == 'true' && 'merge-armed' || (needs.validate_output.outputs.outcome == 'merge' && needs.subject.outputs.auto_merge == 'true') && 'merged' || needs.validate_output.outputs.outcome == 'review' && 'review-requested' || needs.validate_output.outputs.outcome == 'remediated' && 'acted' || needs.validate_output.outputs.outcome == 'invalid' && 'nothing-to-sweep' || 'approved' }}
           route: merge-gate
           subject: ${{ needs.subject.outputs.pr && format('#{0}', needs.subject.outputs.pr) || '-' }}
-          detail: "${{ (needs.validate_output.outputs.outcome == 'merge' && needs.subject.outputs.auto_merge == 'true') && 'The pull request was merged.' || needs.validate_output.outputs.outcome == 'review' && 'The gate asked for a human; the assessment is on the issue.' || needs.validate_output.outputs.outcome == 'invalid' && 'The gate reached no verdict on this run.' || 'The gate approved the pull request; this repository does not merge into that branch unattended, so it waits for a person.' }}"
+          detail: "${{ steps.arm.outputs.armed == 'true' && 'The pull request is marked ready; the forge merges it when the rule holding it is satisfied.' || (needs.validate_output.outputs.outcome == 'merge' && needs.subject.outputs.auto_merge == 'true') && 'The pull request was merged.' || needs.validate_output.outputs.outcome == 'review' && 'The gate asked for a human; the assessment is on the issue.' || needs.validate_output.outputs.outcome == 'invalid' && 'The gate reached no verdict on this run.' || 'The gate approved the pull request; this repository does not merge into that branch unattended, so it waits for a person.' }}"
   incomplete:
     needs: [subject, protected_changes, agent, safe_outputs, validate_output]
     if: >
