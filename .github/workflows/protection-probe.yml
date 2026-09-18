@@ -1,0 +1,83 @@
+# A temporary experiment, not part of the loop. T219: can a GitHub App merge a pull request
+# when a ruleset requires an approving review? Every auto-merge result this canary has
+# produced was obtained with no protection configured, and the answer decides whether the
+# path-based gating design can rely on the forge blocking a merge or only on our gate
+# declining to perform one.
+#
+# Delete this file when the question is answered.
+name: Protection probe
+
+on:
+  workflow_dispatch:
+    inputs:
+      pr-number:
+        description: Pull request to probe
+        required: true
+        type: string
+      operation:
+        description: What to try
+        required: true
+        type: choice
+        options:
+          - state
+          - approve
+          - merge
+
+permissions:
+  contents: read
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Create bot token
+        id: app-token
+        uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3.2.0
+        with:
+          client-id: ${{ secrets.BOT_APP_ID }}
+          private-key: ${{ secrets.BOT_PRIVATE_KEY }}
+
+      - name: What the forge says about this pull request
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+          REPO: ${{ github.repository }}
+          PR: ${{ inputs.pr-number }}
+        run: |
+          set -euo pipefail
+          echo "── as the App ───────────────────────────────────────────"
+          gh pr view "$PR" --repo "$REPO" \
+            --json number,baseRefName,mergeable,mergeStateStatus,reviewDecision,isDraft
+          gh api "repos/${REPO}/pulls/${PR}" --jq '{mergeable, mergeable_state, rebaseable}'
+
+      - name: Approve as the App
+        if: inputs.operation == 'approve'
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+          REPO: ${{ github.repository }}
+          PR: ${{ inputs.pr-number }}
+        run: |
+          set -euo pipefail
+          # The pull request is authored by github-actions[bot] and this token is the
+          # canary App, so this is not self-approval by either identity.
+          gh api --method POST "repos/${REPO}/pulls/${PR}/reviews" \
+            -f event=APPROVE -f body="Probe: does an App review satisfy a required approval?" \
+            --jq '{id, state, user: .user.login}'
+          sleep 10
+          gh pr view "$PR" --repo "$REPO" --json reviewDecision,mergeStateStatus
+
+      - name: Merge as the App, synchronously
+        if: inputs.operation == 'merge'
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+          REPO: ${{ github.repository }}
+          PR: ${{ inputs.pr-number }}
+        run: |
+          set -euo pipefail
+          # The synchronous endpoint, which is what `gh pr merge` without `--auto` calls.
+          # The distinction matters: the reported behaviour is that auto-merge's deferred
+          # completion does not re-evaluate a bypass grant, and this path does.
+          status=0
+          body="$(gh api --method PUT "repos/${REPO}/pulls/${PR}/merge" \
+            -f merge_method=rebase -i 2>&1)" || status=$?
+          printf '%s\n' "$body"
+          echo "exit=${status}"
