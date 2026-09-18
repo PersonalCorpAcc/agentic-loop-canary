@@ -22,6 +22,7 @@ on:
           - state
           - approve
           - merge
+          - auto
 
 permissions:
   contents: read
@@ -64,6 +65,23 @@ jobs:
             --jq '{id, state, user: .user.login}'
           sleep 10
           gh pr view "$PR" --repo "$REPO" --json reviewDecision,mergeStateStatus
+
+      - name: Ask for auto-merge as the App
+        if: inputs.operation == 'auto'
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+          REPO: ${{ github.repository }}
+          PR: ${{ inputs.pr-number }}
+        run: |
+          set -euo pipefail
+          # The deferred path. The reported behaviour is that its completion does not
+          # re-evaluate a bypass grant, which the synchronous endpoint does; if that is
+          # true, a loop that asked for auto-merge would wait for ever under protection.
+          gh pr merge "$PR" --repo "$REPO" --rebase --auto || echo "auto-merge request failed"
+          for _ in 1 2 3; do
+            sleep 20
+            gh pr view "$PR" --repo "$REPO" --json state,mergeStateStatus,autoMergeRequest               --jq '{state, mergeStateStatus, auto: (.autoMergeRequest != null)}'
+          done
 
       - name: Ask for auto-merge as the App
         if: inputs.operation == 'auto'
