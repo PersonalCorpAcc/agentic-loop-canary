@@ -1,4 +1,4 @@
-# Managed by @plainconceptsplatform/workflows@0.5.1. Source: loops/workflows/work-router.yml. Profile digest: bac61e5585d7. Update with `workflows update --force`; consumer edits may be overwritten.
+# Managed by @plainconceptsplatform/workflows@0.5.1. Source: loops/workflows/work-router.yml. Profile digest: ca96e80f128f. Update with `workflows update --force`; consumer edits may be overwritten.
 name: "All Work Router"
 
 # Owns every repository automation trigger. Classifies each event into exactly one route,
@@ -108,6 +108,23 @@ on:
     workflows: ["CI"]
     types: [completed]
 
+  # Cron to route mapping lives in .github/actions/classify-route/classify-route.sh.
+  schedule:
+    # Every consumer installs this same file, and the agent fleet is one shared, two-VM scale
+    # set, so two repositories left on the same minute audit at the same minute. The slot is
+    # a profile value (`crons.audit`); see "Scheduling across repositories" in the package
+    # README for the organisation's table.
+    #
+    # Every one of these is projected from the same profile entry the classifier reads, so
+    # the two cannot disagree. They used to be literals in both files with a comment asking
+    # the reader to keep them in step, and a schedule that fires at a minute the classifier
+    # does not recognise routes nowhere: the run is green and the work never happens.
+    #
+    # Every line is optional, and a profile that sets a clock to `off` removes it here and
+    # the classifier's matching constant together, so a route cannot be fired by a schedule
+    # nothing answers to. Silencing used to be a hand edit that every reinstall undid without
+    # saying so (FR-081).
+    - cron: "17 * * * *"
 
   workflow_dispatch:
     inputs:

@@ -1,8 +1,11 @@
 import { createServer } from "node:http";
+import { dirname, join } from "node:path";
+import { fileURLToPath } from "node:url";
 import { WebSocketServer } from "ws";
 
 import type { LoopEvent, LoopRun } from "../shared/types.js";
 import { listRuns } from "./runs.js";
+import { serveAsset } from "./static.js";
 
 /**
  * The server half: it reads the loop's runs from the forge and pushes them at a browser.
@@ -16,8 +19,12 @@ import { listRuns } from "./runs.js";
  * than "here is the whole world again".
  */
 
+// The platform chooses the port and tells us through the environment; 8787 is only the
+// local default. Binding a fixed port on a host that routes to a different one is a service
+// that builds, starts, reports healthy, and answers nothing.
 const port = Number(process.env["PORT"] ?? 8787);
 const pollSeconds = Number(process.env["POLL_SECONDS"] ?? 20);
+const webRoot = process.env["WEB_ROOT"] ?? join(dirname(fileURLToPath(import.meta.url)), "..", "..", "dist");
 
 const server = createServer(async (request, response) => {
   if (request.url === "/api/runs") {
@@ -31,8 +38,8 @@ const server = createServer(async (request, response) => {
     response.end(JSON.stringify({ ok: true }));
     return;
   }
-  response.writeHead(404);
-  response.end();
+  // Everything else is the front end: a built asset, or index.html for a client route.
+  serveAsset(webRoot, request.url ?? "/", response);
 });
 
 const sockets = new WebSocketServer({ server, path: "/events" });
