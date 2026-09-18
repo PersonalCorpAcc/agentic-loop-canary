@@ -1,4 +1,4 @@
-# Managed by @plainconceptsplatform/workflows@0.5.1. Source: loops/actions/validate-refine-output/action.yml. Profile digest: 1a8a08322b06. Update with workflows update --force; consumer edits may be overwritten.
+# Managed by @plainconceptsplatform/workflows@0.5.1. Source: loops/actions/validate-refine-output/action.yml. Profile digest: 76d2155c1f82. Update with workflows update --force; consumer edits may be overwritten.
 name: Validate refine output
 description: Verify agent_output.json contains a usable refinement outcome before any GitHub writes.
 inputs:

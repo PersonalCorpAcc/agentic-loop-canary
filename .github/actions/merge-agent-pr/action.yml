@@ -1,4 +1,4 @@
-# Managed by @plainconceptsplatform/workflows@0.5.1. Source: loops/actions/merge-agent-pr/action.yml. Profile digest: 1a8a08322b06. Update with workflows update --force; consumer edits may be overwritten.
+# Managed by @plainconceptsplatform/workflows@0.5.1. Source: loops/actions/merge-agent-pr/action.yml. Profile digest: 76d2155c1f82. Update with workflows update --force; consumer edits may be overwritten.
 name: Merge agent pull request
 description: Read merge_pull_request from agent_output.json and merge the PR via gh, once the forge says it will take it.
 inputs:
@@ -18,7 +18,7 @@ inputs:
     default: 'rebase'
 outputs:
   outcome:
-    description: merged, review when the forge will not take it, or none when the agent asked for no merge.
+    description: merged, armed when a rule is holding it and auto-merge now owns the merge, review when the forge will not take it, or none when the agent asked for no merge.
     value: ${{ steps.merge.outputs.outcome || steps.subject.outputs.outcome }}
 runs:
   using: composite
@@ -59,9 +59,31 @@ runs:
         PR_NUM: ${{ steps.subject.outputs.pr }}
         MERGE_METHOD: ${{ inputs.merge-method }}
         MERGEABLE: ${{ steps.preconditions.outputs.mergeable }}
+        DEFERRABLE: ${{ steps.preconditions.outputs.deferrable }}
         REFUSAL: ${{ steps.preconditions.outputs.refusal }}
       run: |
         set -euo pipefail
+
+        # A rule is holding it and the rule may still be satisfied, so the pull request is
+        # marked ready rather than handed over: the forge merges it when the required review
+        # or check arrives (FR-080). Nothing here merges past a rule, with or without a
+        # bypass permission.
+        if [ "$MERGEABLE" != "true" ] && [ "$DEFERRABLE" = "true" ]; then
+          if armed="$(gh pr merge "$PR_NUM" --repo "$REPO" "--${MERGE_METHOD}" --auto 2>&1)"; then
+            echo "outcome=armed" >> "$GITHUB_OUTPUT"
+            gh pr comment "$PR_NUM" --repo "$REPO" --body "The merge gate marked this pull request ready: ${REFUSAL}"
+            echo "PR #${PR_NUM}: auto-merge armed (${MERGE_METHOD})."
+            exit 0
+          fi
+          # Allow auto-merge is off, which is the repository default. Named, because the
+          # alternative is a pull request that waits for ever with nothing saying why.
+          echo "outcome=review" >> "$GITHUB_OUTPUT"
+          gh pr comment "$PR_NUM" --repo "$REPO" --body "The merge gate did not merge this pull request: ${REFUSAL}
+
+          It could not be marked ready either, because **Allow auto-merge** is switched off for this repository. Turn it on in Settings, or merge by hand once the rule is satisfied."
+          echo "::warning::PR #${PR_NUM} was not merged and could not be armed. ${armed}"
+          exit 0
+        fi
 
         if [ "$MERGEABLE" != "true" ]; then
           # A review, not a red run: the run failing says neither which pull request nor

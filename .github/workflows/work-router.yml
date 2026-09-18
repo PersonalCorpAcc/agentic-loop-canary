@@ -1,4 +1,4 @@
-# Managed by @plainconceptsplatform/workflows@0.5.1. Source: loops/workflows/work-router.yml. Profile digest: 1a8a08322b06. Update with `workflows update --force`; consumer edits may be overwritten.
+# Managed by @plainconceptsplatform/workflows@0.5.1. Source: loops/workflows/work-router.yml. Profile digest: 76d2155c1f82. Update with `workflows update --force`; consumer edits may be overwritten.
 name: "All Work Router"
 
 # Owns every repository automation trigger. Classifies each event into exactly one route,
@@ -108,27 +108,6 @@ on:
     workflows: ["CI"]
     types: [completed]
 
-  # Cron to route mapping lives in .github/actions/classify-route/classify-route.sh.
-  # Every schedule this loop installs, commented out on purpose while the canary is being
-  # set up: installing starts five clocks at once, and a repository that fails at one of
-  # them spends its whole Actions allowance discovering that, twice a day, unwatched. That
-  # is not a hypothetical -- it is the 147 runs of 15-16/09/2026. Uncomment them one at a
-  # time, with somebody watching, once a dispatched cycle has run green end to end (T193).
-  # schedule:
-  #   # Every consumer installs this same file, and the agent fleet is one shared, two-VM scale
-  #   # set, so two repositories left on the same minute audit at the same minute. The slot is
-  #   # a profile value (`crons.audit`); see "Scheduling across repositories" in the package
-  #   # README for the organisation's table.
-  #   #
-  #   # Every one of these is projected from the same profile entry the classifier reads, so
-  #   # the two cannot disagree. They used to be literals in both files with a comment asking
-  #   # the reader to keep them in step, and a schedule that fires at a minute the classifier
-  #   # does not recognise routes nowhere: the run is green and the work never happens.
-  #   - cron: "17 1 * * 1"
-  #   - cron: "43 3 * * *"
-  #   - cron: "0 6 * * *"
-  #   - cron: "17 * * * *"
-  #   - cron: "*/30 * * * *" # promotion; the line goes where there is nowhere to promote into (FR-031)
 
   workflow_dispatch:
     inputs:
@@ -146,6 +125,7 @@ on:
           - audit-close
           - cleanup-artifacts
           - promote
+          - sync-stages
           - reconcile-bot-pr-runs
           - validate
           - release
@@ -1530,6 +1510,53 @@ jobs:
           reason: ${{ steps.promote.outputs.promoted == '0' && (steps.promote.outputs.reason || 'no-eligible-change') || 'promoted' }}
           route: promote
           detail: "${{ steps.promote.outputs.promoted == '0' && 'Nothing was ready to promote; the step log says what was considered and why each one waited.' || format('Opened {0} promotion pull request(s).', steps.promote.outputs.promoted) }}"
+
+  # The other direction of the chain, and named `sync-stages` for the same reason `promote`
+  # is not `call-sync-stages`: no model runs here at all. Which content an earlier stage is
+  # missing is a patch-id comparison, and carrying it is a cherry-pick (FR-079).
+  #
+  # The same three permissions as `promote`, and for the same reason: it writes a branch and
+  # opens a pull request, and a route with no agent in it has no excuse for a token that can
+  # do anything. It writes no labels, so it does not ask for `issues: write` either.
+  #
+  # Held rather than cancelled, because a run cancelled mid-carry leaves a branch pushed and
+  # no pull request opened.
+  sync-stages:
+    needs: classify
+    if: needs.classify.outputs.route == 'sync-stages'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    concurrency:
+      group: sync-stages
+      cancel-in-progress: false
+    permissions:
+      contents: write
+      pull-requests: write
+    steps:
+      - name: Checkout workflow actions
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+      - name: Create bot token
+        id: app-token
+        uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3.2.0
+        with:
+          client-id: ${{ secrets.BOT_APP_ID }}
+          private-key: ${{ secrets.BOT_PRIVATE_KEY }}
+      - name: Carry what the earlier stages are missing
+        id: sync
+        uses: ./.github/actions/sync-stages
+        with:
+          token: ${{ steps.app-token.outputs.token }}
+      - name: Record the outcome
+        if: always()
+        uses: ./.github/actions/record-outcome
+        with:
+          outcome: ${{ steps.sync.outputs.opened == '0' && (steps.sync.outputs.reason == 'conflict-handed-off' && 'handed-to-human' || 'no-action') || 'acted' }}
+          reason: ${{ steps.sync.outputs.opened == '0' && (steps.sync.outputs.reason || 'stages-aligned') || 'acted' }}
+          route: sync-stages
+          detail: "${{ steps.sync.outputs.opened == '0' && 'Every stage carries the content of the ones after it, or the step log says which pair could not be carried and why.' || format('Opened {0} pull request(s) carrying content back down the chain.', steps.sync.outputs.opened) }}"
 
   audit-close:
     needs: classify
