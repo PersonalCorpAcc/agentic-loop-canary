@@ -115,6 +115,24 @@ release:
 audit:
   cronSlot: 4
 
+# Every clock, off (FR-081).
+#
+# Not a hand edit to the installed router any more: that is what this repository has been
+# carrying since 15/09, and every `add --force` restored the schedule without saying so --
+# caught three times, and the time it was not caught is the 147 failed runs of 15-16/09.
+# Five clocks are about seventy-four router runs a day, roughly 9,000 billable minutes a
+# month against a 2,000-minute allowance (T198).
+#
+# Off is not "never": each route is still reachable by `workflow_dispatch`, which is how the
+# whole chain was proven on 17/09. Turn them on one at a time, with somebody watching.
+crons:
+  audit: off
+  auditClose: off
+  cleanupArtifacts: off
+  reconcileBotPrRuns: off
+  promote: off
+  syncStages: off
+
 constitution:
   entry: AGENTS.md
   docs: [ARCHITECTURE.md]
