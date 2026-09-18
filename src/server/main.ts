@@ -4,7 +4,7 @@ import { fileURLToPath } from "node:url";
 import { WebSocketServer } from "ws";
 
 import type { LoopEvent, LoopRun } from "../shared/types.js";
-import { listRuns } from "./runs.js";
+import { listRuns, repo } from "./runs.js";
 import { serveAsset } from "./static.js";
 
 /**
@@ -52,7 +52,7 @@ function send(socket: { send: (data: string) => void }, event: LoopEvent): void 
 sockets.on("connection", (socket) => {
   // A new tab gets everything once, then only what changes. The two message kinds exist so a
   // reconnect after a laptop lid closes is a snapshot rather than a gap.
-  send(socket, { kind: "snapshot", runs: [...known.values()] });
+  send(socket, { kind: "snapshot", repo, runs: [...known.values()] });
 });
 
 async function poll(): Promise<void> {
