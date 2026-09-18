@@ -1,11 +1,11 @@
 ---
-# Managed by @plainconceptsplatform/workflows@0.5.1. Source: loops/workflows/agent-merge-gate.md. Profile digest: 76d2155c1f82. Update with `workflows update --force`; consumer edits may be overwritten.
+# Managed by @plainconceptsplatform/workflows@0.5.1. Source: loops/workflows/agent-merge-gate.md. Profile digest: b005fbfa185f. Update with `workflows update --force`; consumer edits may be overwritten.
 env:
-  VERIFY_COMMANDS: "go build ./... && go test ./..."
-  REPO_RULES: "Run gofmt over anything you change; a build that fails only on formatting wastes a whole run."
-  PROTECTED_FILES: (^\.|^opencode\.jsonc$|^go\.mod$|^go\.sum$|^AGENTS\.md$|^ARCHITECTURE\.md$)
-  VERIFY_COMMANDS_SCOPED: "golangci-lint run"
-  LINT_FIX_COMMAND: "golangci-lint run --fix"
+  VERIFY_COMMANDS: "pnpm install --frozen-lockfile && pnpm run build && pnpm run test"
+  REPO_RULES: "Make a risk-based merge decision for the selected bot pull request. Merge only when CI is green and no risk indicators are present. Review risk indicators defined in the repository's guardrails or project documentation. Any of these require human review. Do not merge protected file changes."
+  PROTECTED_FILES: (^\.|^opencode\.jsonc$|^package\.json$|^pnpm-lock\.yaml$|^AGENTS\.md$|^ARCHITECTURE\.md$)
+  VERIFY_COMMANDS_SCOPED: "pnpm run typecheck"
+  LINT_FIX_COMMAND: ""
   REPO_VERIFY_COMMAND: repo-verify
   WORKING_LABEL: bot-working
   IMPLEMENT_LABEL: implement
@@ -37,7 +37,7 @@ env:
   PARK_AT_ATTEMPT: "5"
   INCOMPLETE_COMMENT: "Automated CI failure remediation ended without an outcome. The issue remains for a retry."
   ISSUE_CONTEXT_PATH: /tmp/gh-aw/agent/issue-context.json
-  GH_AW_ALLOWED_BOTS: "agentic-loop-canary[bot],github-actions[bot]"
+  GH_AW_ALLOWED_BOTS: "personalcorpacc-agentic-loop[bot],github-actions[bot]"
   GIT_AUTHOR_NAME: "github-actions[bot]"
   GIT_AUTHOR_EMAIL: "github-actions[bot]@users.noreply.github.com"
   GIT_COMMITTER_NAME: "github-actions[bot]"
@@ -56,7 +56,7 @@ name: "Agent: Merge Gate"
 # This workflow receives the classified inputs and runs rung 3+.
 imports:
   - shared/platform-defaults.md
-  - shared/stack-go.md
+  - shared/stack-node-pnpm.md
 on:
   workflow_call:
     inputs:
@@ -103,6 +103,7 @@ jobs:
       actions: read
     outputs:
       found: ${{ steps.subject.outputs.found }}
+      why_not: ${{ steps.subject.outputs.why-not }}
       base: ${{ steps.subject.outputs.base }}
       pr: ${{ steps.subject.outputs.pr }}
       issue: ${{ steps.subject.outputs.issue }}
@@ -194,7 +195,12 @@ jobs:
           reason: ${{ steps.subject.outputs.found == 'true' && 'clear-to-proceed' || 'no-eligible-change' }}
           route: merge-gate
           subject: ${{ steps.subject.outputs.pr && format('#{0}', steps.subject.outputs.pr) || '-' }}
-          detail: "${{ steps.subject.outputs.found == 'true' && 'This pull request is open, bot-authored and carries the required label, so the gate may run.' || 'Nothing to gate: the pull request is not open, was not opened by this loop, or does not carry the required label.' }}"
+          # The reason this pull request is not a subject, as the check that refused it put it.
+          # The old line listed three conditions and let the reader guess, which for a
+          # back-propagation pull request -- opened by this loop, carrying no issue because
+          # what arrived outside the loop had none -- amounted to denying the loop had opened
+          # it (FR-084).
+          detail: "${{ steps.subject.outputs.found == 'true' && 'This pull request is open, bot-authored and carries the required label, so the gate may run.' || format('Nothing to gate: {0}', steps.subject.outputs.why-not || 'this pull request is not one the gate assesses.') }}"
 
   protected_changes:
     needs: subject
@@ -212,12 +218,34 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           REPO: ${{ github.repository }}
           PR: ${{ needs.subject.outputs.pr }}
+          BASE: ${{ needs.subject.outputs.base }}
           # Composed by the installer from the engine baseline, the declared packs'
           # manifests and lockfiles, and the profile's documents (FR-022).
           PROTECTED_FILES: ${{ env.PROTECTED_FILES }}
         run: |
           set -euo pipefail
-          files=$(gh api --paginate "repos/$REPO/pulls/$PR/files?per_page=100" --jq '.[].filename')
+          # Compared against the merge base as it is now, rather than read from the pull
+          # request's own file list (FR-083).
+          #
+          # A pull request keeps the base it was opened against. When the base branch's
+          # history moves -- a back-merge, a realignment, anything that is not a fast-forward
+          # of what it had -- `pulls/{n}/files` goes on answering from the old merge base,
+          # for ever: on the canary on 18/09/2026 it reported 83 changed files where git said
+          # two, and neither a `synchronize` event nor twenty minutes shifted it. This rule
+          # decides whether a person must look at a change, so reading a stale list means
+          # handing over work nobody needed to do -- and, in the other direction, a rule that
+          # is wrong in one direction is not one anybody should trust in the other.
+          #
+          # The three-dot compare is computed when it is asked for, so it cannot go stale.
+          head_sha=$(gh pr view "$PR" --repo "$REPO" --json headRefOid --jq '.headRefOid')
+          files=$(gh api "repos/$REPO/compare/${BASE}...${head_sha}" --jq '.files[]?.filename' || true)
+          # The compare endpoint stops at 300 files and says so by giving exactly that many.
+          # Past it the pull request's own list is the only one available, stale or not, and a
+          # change that large is one a person should see anyway.
+          if [ "$(printf '%s\n' "$files" | grep -c .)" -ge 300 ]; then
+            echo "::warning::PR #${PR} changes 300 files or more, which is the compare limit; falling back to the pull request's own file list."
+            files=$(gh api --paginate "repos/$REPO/pulls/$PR/files?per_page=100" --jq '.[].filename')
+          fi
           protected=$(printf '%s\n' "$files" | grep -E "$PROTECTED_FILES" || true)
 
           if [ -n "$protected" ]; then
@@ -524,10 +552,19 @@ jobs:
             Nothing else is needed from the loop. Nothing about the issue has changed -- it is still reserved and still pending."
             echo "PR #${PR}: auto-merge armed (${MERGE_METHOD}); waiting for the rule to be satisfied."
           else
-            # The repository setting is off, which is its default. Said loudly and named,
-            # because the failure is otherwise a pull request that waits for ever with
-            # nothing anywhere saying why.
+            # The forge's own sentence, carried rather than guessed. There are at least two
+            # causes and they want different remedies: `Auto merge is not allowed for this
+            # repository` is the setting, off by default, and `Merge method rebase merging is
+            # not allowed` is the profile's merge method against what the repository or a
+            # ruleset permits -- observed 18/09/2026. Both refuse at once rather than
+            # accepting and never completing, which is the good outcome; what would make it
+            # expensive is a message that sent the reader to the wrong switch.
             echo "armed=false" >> "$GITHUB_OUTPUT"
+            {
+              echo 'arm_error<<GHAWEOF'
+              printf '%s\n' "$armed" | head -n 3
+              echo GHAWEOF
+            } >> "$GITHUB_OUTPUT"
             echo "::warning::PR #${PR}: auto-merge could not be armed. ${armed}"
           fi
       - name: Hand the merge to a human when the forge refuses it
@@ -538,13 +575,18 @@ jobs:
           PR: ${{ needs.subject.outputs.pr }}
           REFUSAL: ${{ steps.preconditions.outputs.refusal }}
           ARMED: ${{ steps.arm.outputs.armed }}
+          ARM_ERROR: ${{ steps.arm.outputs.arm_error }}
           DEFERRABLE: ${{ steps.preconditions.outputs.deferrable }}
         run: |
           set -euo pipefail
           if [ "$DEFERRABLE" = "true" ] && [ "$ARMED" != "true" ]; then
             gh pr comment "$PR" --repo "$REPO" --body "The merge gate approved this pull request but could not merge or queue it: ${REFUSAL}
 
-            It could not be marked ready either, because **Allow auto-merge** is switched off for this repository -- it is off by default. Turn it on in Settings, or merge this pull request by hand once the rule is satisfied."
+            It could not be marked ready either. The forge said:
+
+            > ${ARM_ERROR:-no reason given}
+
+            Two things cause that. **Allow auto-merge** may be switched off for this repository, which is its default. Or the merge method this loop is configured for may not be one the repository or its rulesets permit, in which case the two settings disagree and one of them has to move. Either way this pull request waits for a person."
           else
             gh pr comment "$PR" --repo "$REPO" --body "The merge gate approved this pull request but did not merge it: ${REFUSAL}"
           fi

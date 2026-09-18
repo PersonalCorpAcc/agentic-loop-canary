@@ -1,7 +1,7 @@
 ---
-# Managed by @plainconceptsplatform/workflows@0.5.1. Source: loops/workflows/agent-audit.md. Profile digest: 76d2155c1f82. Update with `workflows update --force`; consumer edits may be overwritten.
+# Managed by @plainconceptsplatform/workflows@0.5.1. Source: loops/workflows/agent-audit.md. Profile digest: b005fbfa185f. Update with `workflows update --force`; consumer edits may be overwritten.
 env:
-  REPO_RULES: "Run gofmt over anything you change; a build that fails only on formatting wastes a whole run."
+  REPO_RULES: "Read-only repository audit. Report only reproducible, actionable defects with evidence. Look for: architectural layer violations, missing tests, security gaps, performance issues, and documentation drift. Do not modify files, commit, push, or run write operations."
   REPO_AUDIT_SKILL: repo-audit
   REPO_AUDIT_COMMAND: repo-audit
   PLAN_STORY_SKILL: plan-story
@@ -29,7 +29,7 @@ name: "Agent: Audit"
 # permissions, engine, model and runs-on cannot be shared , see shared/platform-defaults.md.
 imports:
   - shared/platform-defaults.md
-  - shared/stack-go.md
+  - shared/stack-node-pnpm.md
 on:
   workflow_call:
     inputs:

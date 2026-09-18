@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Managed by @plainconceptsplatform/workflows@0.5.1. Source: loops/actions/verify-route-matrix/verify-route-matrix.sh. Profile digest: 76d2155c1f82. Update with `workflows update --force`; consumer edits may be overwritten.
+# Managed by @plainconceptsplatform/workflows@0.5.1. Source: loops/actions/verify-route-matrix/verify-route-matrix.sh. Profile digest: b005fbfa185f. Update with `workflows update --force`; consumer edits may be overwritten.
 # Exercise the router's real classifier. This sources classify-route.sh rather than
 # restating it, so a change to the route table cannot pass here by being copied twice.
 #
@@ -73,11 +73,11 @@ echo "── Label events ──────────────────
 assert_route "human refine label waits for authorization" none \
   EVENT=issues ACTION=labeled LABEL=refine ACTOR=maintainer EVENT_ISSUE_NUMBER=42
 assert_route "bot refine label routes to refine" refine \
-  EVENT=issues ACTION=labeled LABEL=refine ACTOR=agentic-loop-canary[bot] EVENT_ISSUE_NUMBER=42
+  EVENT=issues ACTION=labeled LABEL=refine ACTOR=personalcorpacc-agentic-loop[bot] EVENT_ISSUE_NUMBER=42
 assert_route "human implement label waits for authorization" none \
   EVENT=issues ACTION=labeled LABEL=implement ACTOR=maintainer EVENT_ISSUE_NUMBER=42
 assert_route "bot implement label routes to implement" implement \
-  EVENT=issues ACTION=labeled LABEL=implement ACTOR=agentic-loop-canary[bot] EVENT_ISSUE_NUMBER=42
+  EVENT=issues ACTION=labeled LABEL=implement ACTOR=personalcorpacc-agentic-loop[bot] EVENT_ISSUE_NUMBER=42
 assert_route "human feature label waits for authorization" none \
   EVENT=issues ACTION=labeled LABEL=feature ACTOR=maintainer EVENT_ISSUE_NUMBER=350
 assert_route "unrelated label routes nowhere" none \
@@ -91,11 +91,11 @@ assert_route "issue opened with implement label skips triage" none \
 assert_route "a human triage label routes to triage" triage \
   EVENT=issues ACTION=labeled LABEL=triage ACTOR=maintainer EVENT_ISSUE_NUMBER=42
 assert_route "a bot triage label routes nowhere" none \
-  EVENT=issues ACTION=labeled LABEL=triage ACTOR=agentic-loop-canary[bot] EVENT_ISSUE_NUMBER=42
+  EVENT=issues ACTION=labeled LABEL=triage ACTOR=personalcorpacc-agentic-loop[bot] EVENT_ISSUE_NUMBER=42
 assert_route "implement + bot-working without feature routes to implement" implement \
   EVENT=issues ACTION=labeled LABEL=bot-working 'ISSUE_LABELS=["implement","bot-working"]' EVENT_ISSUE_NUMBER=300
 assert "refine label starts a first pass" first \
-  "$(route_field refine-mode EVENT=issues ACTION=labeled LABEL=refine ACTOR=agentic-loop-canary[bot] EVENT_ISSUE_NUMBER=42)"
+  "$(route_field refine-mode EVENT=issues ACTION=labeled LABEL=refine ACTOR=personalcorpacc-agentic-loop[bot] EVENT_ISSUE_NUMBER=42)"
 
 echo "── Comment events ────────────────────────────────────────────────────────"
 assert_route "a comment on a pull request routes to apply-review" apply-review \
@@ -719,9 +719,9 @@ if [ "$STRATEGY_OK" -eq 1 ]; then
   # clearing the in-flight labels starts nothing either. A label that did route would make
   # every merge a loop.
   assert_route "the merged-stage label this route writes starts nothing" none \
-    EVENT=issues ACTION=labeled "LABEL=${MERGED_STAGE_LABEL_FOR_TEST}" ACTOR=agentic-loop-canary[bot] EVENT_ISSUE_NUMBER=42
+    EVENT=issues ACTION=labeled "LABEL=${MERGED_STAGE_LABEL_FOR_TEST}" ACTOR=personalcorpacc-agentic-loop[bot] EVENT_ISSUE_NUMBER=42
   assert_route "clearing the implement label starts nothing" none \
-    EVENT=issues ACTION=unlabeled LABEL=implement ACTOR=agentic-loop-canary[bot] EVENT_ISSUE_NUMBER=42
+    EVENT=issues ACTION=unlabeled LABEL=implement ACTOR=personalcorpacc-agentic-loop[bot] EVENT_ISSUE_NUMBER=42
 
   assert_route "a merge into a branch that is no stage stays with the approval route" bot-approve \
     EVENT=pull_request_target ACTION=closed PR_MERGED=true PR_BASE_REF=chore/not-a-stage EVENT_PR_NUMBER=7
