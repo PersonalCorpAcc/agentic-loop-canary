@@ -58,6 +58,23 @@ func TestString(t *testing.T) {
 	}
 }
 
+func TestIsPrerelease(t *testing.T) {
+	cases := []struct {
+		name string
+		v    Version
+		want bool
+	}{
+		{"plain version", Version{Major: 1, Minor: 2, Patch: 3}, false},
+		{"pre-release version", Version{Major: 1, Minor: 2, Patch: 3, PreRelease: "rc.1"}, true},
+		{"build metadata only", Version{Major: 1, Minor: 2, Patch: 3}, false},
+	}
+	for _, c := range cases {
+		if got := IsPrerelease(c.v); got != c.want {
+			t.Errorf("%s: IsPrerelease(%+v) = %v, want %v", c.name, c.v, got, c.want)
+		}
+	}
+}
+
 func TestCompare(t *testing.T) {
 	cases := []struct {
 		a, b string
