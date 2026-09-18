@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Managed by @plainconceptsplatform/workflows@0.5.1. Source: loops/actions/record-outcome/record-outcome.sh. Profile digest: 1a8a08322b06. Update with `workflows update --force`; consumer edits may be overwritten.
+# Managed by @plainconceptsplatform/workflows@0.5.1. Source: loops/actions/record-outcome/record-outcome.sh. Profile digest: 76d2155c1f82. Update with `workflows update --force`; consumer edits may be overwritten.
 #
 # One line per job saying what happened and why (FR-058).
 #
@@ -30,6 +30,9 @@ readonly REASONS=(
   approved
   promoted
   labelled
+  # The change is ready and the forge owns the merge now: a repository rule is holding the
+  # pull request, auto-merge is armed, and it lands when the rule is satisfied (FR-080).
+  merge-armed
   # Nothing to do, and why not.
   soak-pending
   hold
@@ -44,6 +47,9 @@ readonly REASONS=(
   duplicate-in-flight
   clear-to-proceed
   nothing-to-sweep
+  # Every stage carries the content of the ones after it, so there is nothing to carry back
+  # down the chain (FR-079).
+  stages-aligned
   # A human is needed, or the machinery could not proceed.
   conflict-handed-off
   review-requested

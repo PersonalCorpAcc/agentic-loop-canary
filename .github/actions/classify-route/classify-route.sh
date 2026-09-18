@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Managed by @plainconceptsplatform/workflows@0.5.1. Source: loops/actions/classify-route/classify-route.sh. Profile digest: 1a8a08322b06. Update with `workflows update --force`; consumer edits may be overwritten.
+# Managed by @plainconceptsplatform/workflows@0.5.1. Source: loops/actions/classify-route/classify-route.sh. Profile digest: 76d2155c1f82. Update with `workflows update --force`; consumer edits may be overwritten.
 # Classify one GitHub event into exactly one route. Pure: no network, no gh calls, so
 # verify-route-matrix.sh can source this file and exercise the same code the router runs.
 #
@@ -35,14 +35,15 @@ readonly STAGE_BRANCHES=("dev" "test" "main")
 readonly CUT_FROM="main"
 readonly CLOSE_ISSUE_ON="main"
 
-readonly AUDIT_CRON="17 1 * * 1"
-readonly AUDIT_CLOSE_CRON="43 3 * * *"
-readonly CLEANUP_ARTIFACTS_CRON="0 6 * * *"
-readonly RECONCILE_BOT_PR_RUNS_CRON="17 * * * *"
+# Each clock is optional, because a profile may set any of them to `off` and the line then
+# disappears along with the router's schedule entry (FR-081). Every reader below asks whether
+# the constant exists before comparing, so a silenced route is one nothing can reach by a
+# schedule rather than one that fires at a minute this file does not recognise.
 # The fifth clock, and the only one a profile can switch off: a trunk repository has no
 # later stage to promote into, so the projector writes no value and this line disappears
 # with it (FR-031).
-readonly PROMOTE_CRON="*/30 * * * *"
+# The sixth, and switched off by the same fact: a repository with one branch has no stage
+# that can fall behind another, so there is nothing to carry back down (FR-079).
 
 has_label() {
   jq -e --arg name "$1" 'index($name)' >/dev/null 2>&1 <<<"${ISSUE_LABELS:-[]}"
@@ -237,19 +238,24 @@ classify_route() {
 
     schedule)
       trigger_kind="scheduled"
-      case "${SCHEDULE:-}" in
-        "$AUDIT_CRON") route="audit" ;;
-        "$AUDIT_CLOSE_CRON") route="audit-close" ;;
-        "$CLEANUP_ARTIFACTS_CRON") route="cleanup-artifacts" ;;
-        "$RECONCILE_BOT_PR_RUNS_CRON") route="reconcile-bot-pr-runs" ;;
-        *)
-          if [ -n "${PROMOTE_CRON:-}" ] && [ "${SCHEDULE:-}" = "$PROMOTE_CRON" ]; then
-            route="promote"
-          else
-            error="no route for cron '${SCHEDULE:-}'"
-          fi
-          ;;
-      esac
+      # One shape for all six, because any of them may be absent: a `case` on a constant that
+      # does not exist matches the empty string, so a silenced clock would answer for a
+      # schedule with no value at all. Each is compared only when it has one.
+      if [ -n "${AUDIT_CRON:-}" ] && [ "${SCHEDULE:-}" = "$AUDIT_CRON" ]; then
+        route="audit"
+      elif [ -n "${AUDIT_CLOSE_CRON:-}" ] && [ "${SCHEDULE:-}" = "$AUDIT_CLOSE_CRON" ]; then
+        route="audit-close"
+      elif [ -n "${CLEANUP_ARTIFACTS_CRON:-}" ] && [ "${SCHEDULE:-}" = "$CLEANUP_ARTIFACTS_CRON" ]; then
+        route="cleanup-artifacts"
+      elif [ -n "${RECONCILE_BOT_PR_RUNS_CRON:-}" ] && [ "${SCHEDULE:-}" = "$RECONCILE_BOT_PR_RUNS_CRON" ]; then
+        route="reconcile-bot-pr-runs"
+      elif [ -n "${PROMOTE_CRON:-}" ] && [ "${SCHEDULE:-}" = "$PROMOTE_CRON" ]; then
+        route="promote"
+      elif [ -n "${SYNC_STAGES_CRON:-}" ] && [ "${SCHEDULE:-}" = "$SYNC_STAGES_CRON" ]; then
+        route="sync-stages"
+      else
+        error="no route for cron '${SCHEDULE:-}'"
+      fi
       ;;
 
     workflow_dispatch)
@@ -314,6 +320,15 @@ classify_route() {
             error="this repository merges into one branch, so there is nowhere to promote to"
           else
             route="promote"
+          fi
+          ;;
+        sync-stages)
+          # The same fact from the other end: one branch cannot fall behind another, so
+          # there is nothing to carry back down (FR-079).
+          if [ "${BRANCH_STRATEGY}" = "trunk" ]; then
+            error="this repository merges into one branch, so no stage can fall behind another"
+          else
+            route="sync-stages"
           fi
           ;;
         release)
