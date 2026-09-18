@@ -4,7 +4,7 @@
 # months, and the chain is the one nothing has ever executed. Work is cut from `main`,
 # opens against `dev`, and is promoted dev → test → main, closing its issue at `main`.
 version: 1
-name: agentic-loop-canary
+name: loopscope
 
 runners:
   agent: [ubuntu-latest]
@@ -54,12 +54,15 @@ memory:
 codegraph:
   enabled: false
 
-stack: [go]
+stack: [node-pnpm]
 projects:
   - path: .
-    stack: go
+    stack: node-pnpm
     label: app
-    verify: go build ./... && go test ./...
+    install: pnpm install --frozen-lockfile
+    build: pnpm run build
+    test: pnpm run test
+    lint: pnpm run typecheck
 
 branching:
   strategy: branch-chain
@@ -114,15 +117,21 @@ protection:
     - team: agentic-team
       approvals: 1
       stages: [test, main]
+    # A path a person must see, chosen so that it tests the forge's rule rather than our
+    # own: `.github/**` is already in protectedFiles, which stops the model before the
+    # ruleset is ever consulted, so a change there proves nothing about required reviewers.
     - team: agentic-team
       approvals: 1
-      paths: [".github/**"]
+      paths: ["deploy/**"]
 
 changelog:
   path: CHANGELOG.json
 
 ci:
-  template: app-ci-go
+  # One package, one test script: the monorepo template wires in Biome, Stryker and
+  # Playwright, which this application does not use and should not have to adopt to get a
+  # green check.
+  template: app-ci-node-app
   workflowName: CI
 
 release:

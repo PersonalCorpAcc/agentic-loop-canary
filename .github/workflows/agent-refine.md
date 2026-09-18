@@ -1,7 +1,7 @@
 ---
-# Managed by @plainconceptsplatform/workflows@0.5.1. Source: loops/workflows/agent-refine.md. Profile digest: beaf94f47bcb. Update with `workflows update --force`; consumer edits may be overwritten.
+# Managed by @plainconceptsplatform/workflows@0.5.1. Source: loops/workflows/agent-refine.md. Profile digest: b005fbfa185f. Update with `workflows update --force`; consumer edits may be overwritten.
 env:
-  REPO_RULES: "Run gofmt over anything you change; a build that fails only on formatting wastes a whole run."
+  REPO_RULES: "Refine only the selected issue into a grounded, implementation-ready user story. Read repository documentation for domain context. Write acceptance criteria that match existing patterns. Do not implement code."
   PLAN_EXPLORE_SKILL: plan-explore
   PLAN_STORY_SKILL: plan-story
   PLAN_STORY_COMMAND: plan-story
@@ -49,7 +49,7 @@ name: "Agent: Refine Issue"
 
 imports:
   - shared/platform-defaults.md
-  - shared/stack-go.md
+  - shared/stack-node-pnpm.md
 on:
   workflow_call:
     inputs:

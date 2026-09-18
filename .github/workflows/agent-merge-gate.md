@@ -1,11 +1,11 @@
 ---
-# Managed by @plainconceptsplatform/workflows@0.5.1. Source: loops/workflows/agent-merge-gate.md. Profile digest: beaf94f47bcb. Update with `workflows update --force`; consumer edits may be overwritten.
+# Managed by @plainconceptsplatform/workflows@0.5.1. Source: loops/workflows/agent-merge-gate.md. Profile digest: b005fbfa185f. Update with `workflows update --force`; consumer edits may be overwritten.
 env:
-  VERIFY_COMMANDS: "go build ./... && go test ./..."
-  REPO_RULES: "Run gofmt over anything you change; a build that fails only on formatting wastes a whole run."
-  PROTECTED_FILES: (^\.|^opencode\.jsonc$|^go\.mod$|^go\.sum$|^AGENTS\.md$|^ARCHITECTURE\.md$)
-  VERIFY_COMMANDS_SCOPED: "golangci-lint run"
-  LINT_FIX_COMMAND: "golangci-lint run --fix"
+  VERIFY_COMMANDS: "pnpm install --frozen-lockfile && pnpm run build && pnpm run test"
+  REPO_RULES: "Make a risk-based merge decision for the selected bot pull request. Merge only when CI is green and no risk indicators are present. Review risk indicators defined in the repository's guardrails or project documentation. Any of these require human review. Do not merge protected file changes."
+  PROTECTED_FILES: (^\.|^opencode\.jsonc$|^package\.json$|^pnpm-lock\.yaml$|^AGENTS\.md$|^ARCHITECTURE\.md$)
+  VERIFY_COMMANDS_SCOPED: "pnpm run typecheck"
+  LINT_FIX_COMMAND: ""
   REPO_VERIFY_COMMAND: repo-verify
   WORKING_LABEL: bot-working
   IMPLEMENT_LABEL: implement
@@ -56,7 +56,7 @@ name: "Agent: Merge Gate"
 # This workflow receives the classified inputs and runs rung 3+.
 imports:
   - shared/platform-defaults.md
-  - shared/stack-go.md
+  - shared/stack-node-pnpm.md
 on:
   workflow_call:
     inputs:

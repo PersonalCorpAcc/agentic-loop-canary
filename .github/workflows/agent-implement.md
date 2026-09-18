@@ -1,10 +1,10 @@
 ---
-# Managed by @plainconceptsplatform/workflows@0.5.1. Source: loops/workflows/agent-implement.md. Profile digest: beaf94f47bcb. Update with `workflows update --force`; consumer edits may be overwritten.
+# Managed by @plainconceptsplatform/workflows@0.5.1. Source: loops/workflows/agent-implement.md. Profile digest: b005fbfa185f. Update with `workflows update --force`; consumer edits may be overwritten.
 env:
-  VERIFY_COMMANDS: "go build ./... && go test ./..."
-  REPO_RULES: "Run gofmt over anything you change; a build that fails only on formatting wastes a whole run."
-  VERIFY_COMMANDS_SCOPED: "golangci-lint run"
-  LINT_FIX_COMMAND: "golangci-lint run --fix"
+  VERIFY_COMMANDS: "pnpm install --frozen-lockfile && pnpm run build && pnpm run test"
+  REPO_RULES: "Implement only the selected issue. Follow the repository's own documentation and conventions, and do not weaken tests or bypass checks."
+  VERIFY_COMMANDS_SCOPED: "pnpm run typecheck"
+  LINT_FIX_COMMAND: ""
   PLAN_RUN_SKILL: plan-run
   PLAN_RUN_COMMAND: plan-run
   PLAN_EXPLORE_SKILL: plan-explore
@@ -61,7 +61,7 @@ name: "Agent: Implement Issue"
 # permissions, engine, model and runs-on cannot be shared , see shared/platform-defaults.md.
 imports:
   - shared/platform-defaults.md
-  - shared/stack-go.md
+  - shared/stack-node-pnpm.md
 on:
   workflow_call:
     inputs:
