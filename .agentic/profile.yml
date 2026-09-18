@@ -103,7 +103,10 @@ branching:
   # `off` or `always`.
   autoMerge:
     mode: always
-    targets: [dev, test, main]
+    # The loop's own policy, and the coarser of the two halves: which stages it may merge
+    # into at all. `main` is absent deliberately -- production is a person's to land, and
+    # saying so here means the loop declines even where the forge would allow it.
+    targets: [dev, test]
 
 # What the forge is asked to enforce, which is a different thing from what the loop does
 # (FR-085). Rendered by `workflows protection`, applied by a person, and checked by
@@ -114,15 +117,27 @@ branching:
 # that on 18/09/2026. It cannot join a team.
 protection:
   reviewers:
+    # Three different gates, so that one repository shows all three shapes at once.
+    #
+    # Production: everything stops for a person, whatever it touches. The environment is the
+    # criterion.
     - team: agentic-team
       approvals: 1
-      stages: [test, main]
-    # A path a person must see, chosen so that it tests the forge's rule rather than our
-    # own: `.github/**` is already in protectedFiles, which stops the model before the
-    # ruleset is ever consulted, so a change there proves nothing about required reviewers.
+      stages: [main]
+    # Infrastructure: every stage, because a change to how this thing deploys is not made
+    # unattended anywhere. The path is the criterion, and `deploy/**` is chosen over
+    # `.github/**` because the latter is already in protectedFiles -- our own rule stops the
+    # model before the forge is ever consulted, so it would prove nothing about the ruleset.
     - team: agentic-team
       approvals: 1
       paths: ["deploy/**"]
+    # The loop's own wiring, from `test` upward: an agent may change a workflow on `dev`
+    # where it is cheap to undo, and a person looks before it goes further. Path and
+    # environment together.
+    - team: agentic-team
+      approvals: 1
+      stages: [test]
+      paths: [".github/**"]
 
 changelog:
   path: CHANGELOG.json

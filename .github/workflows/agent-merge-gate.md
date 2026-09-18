@@ -1,5 +1,5 @@
 ---
-# Managed by @plainconceptsplatform/workflows@0.5.1. Source: loops/workflows/agent-merge-gate.md. Profile digest: b005fbfa185f. Update with `workflows update --force`; consumer edits may be overwritten.
+# Managed by @plainconceptsplatform/workflows@0.5.1. Source: loops/workflows/agent-merge-gate.md. Profile digest: bac61e5585d7. Update with `workflows update --force`; consumer edits may be overwritten.
 env:
   VERIFY_COMMANDS: "pnpm install --frozen-lockfile && pnpm run build && pnpm run test"
   REPO_RULES: "Make a risk-based merge decision for the selected bot pull request. Merge only when CI is green and no risk indicators are present. Review risk indicators defined in the repository's guardrails or project documentation. Any of these require human review. Do not merge protected file changes."
@@ -30,7 +30,7 @@ env:
   # a human gate is branch protection plus somebody's judgement, not a sentence in a prompt
   # (FR-035, FR-036).
   AUTO_MERGE_MODE: "always"
-  AUTO_MERGE_TARGETS: "dev,test,main"
+  AUTO_MERGE_TARGETS: "dev,test"
   GATE_MARKER: "<!-- agent-merge-gate -->"
   ATTEMPT_MARKER: "<!-- agent-merge-gate-attempt -->"
   MAX_ATTEMPTS: "6"

@@ -1,5 +1,5 @@
 ---
-# Managed by @plainconceptsplatform/workflows@0.5.1. Source: loops/workflows/agent-audit.md. Profile digest: b005fbfa185f. Update with `workflows update --force`; consumer edits may be overwritten.
+# Managed by @plainconceptsplatform/workflows@0.5.1. Source: loops/workflows/agent-audit.md. Profile digest: bac61e5585d7. Update with `workflows update --force`; consumer edits may be overwritten.
 env:
   REPO_RULES: "Read-only repository audit. Report only reproducible, actionable defects with evidence. Look for: architectural layer violations, missing tests, security gaps, performance issues, and documentation drift. Do not modify files, commit, push, or run write operations."
   REPO_AUDIT_SKILL: repo-audit
