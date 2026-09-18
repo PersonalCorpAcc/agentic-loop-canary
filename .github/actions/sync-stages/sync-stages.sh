@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Managed by @plainconceptsplatform/workflows@0.5.1. Source: loops/actions/sync-stages/sync-stages.sh. Profile digest: 76d2155c1f82. Update with `workflows update --force`; consumer edits may be overwritten.
+# Managed by @plainconceptsplatform/workflows@0.5.1. Source: loops/actions/sync-stages/sync-stages.sh. Profile digest: b005fbfa185f. Update with `workflows update --force`; consumer edits may be overwritten.
 #
 # Carry a change that arrived on a later stage back down the chain (FR-079).
 #
@@ -175,51 +175,44 @@ for (( index=${#stages[@]} - 1; index > 0; index-- )); do
   git switch --detach "refs/remotes/origin/${earlier}" >/dev/null 2>&1
   git switch -c "$sync_branch" >/dev/null 2>&1
 
-  picked=true
-  conflict_sha=""
-  conflict_files=""
-  for sha in "${to_pick[@]}"; do
-    if git cherry-pick "$sha" >/dev/null 2>&1; then
-      continue
-    fi
-    # Nothing staged means the content is already here by another route, one step later than
-    # the patch-id filter says so. Skipping it is the same answer and is why a re-run neither
-    # duplicates nor fails.
-    if git diff --cached --quiet 2>/dev/null && git diff --quiet 2>/dev/null; then
-      git cherry-pick --skip >/dev/null 2>&1 || git cherry-pick --abort >/dev/null 2>&1 || true
-      continue
-    fi
-    # Read before the abort: the abort is what throws the answer away, and a hand-off that
-    # says only "it conflicts" leaves the person to find out where, which is the work.
-    conflict_sha="$sha"
+  # A merge, not a sequence of cherry-picks (FR-082).
+  #
+  # Cherry-picking gave the earlier stage the *content* and not the *history*, and the
+  # difference is not academic: a pull request's file list is computed against the merge base,
+  # so until `dev` actually contains `main`'s commits every pull request into `dev` diffs
+  # against a point before the drift and carries files it never touched. That trips the
+  # protected-files rule, hands the change to a person, and makes any test on it prove
+  # nothing -- which is what happened on the canary on 18/09/2026: two sync pull requests had
+  # merged, `doctor` reported the stages aligned, and the next agent's pull request still
+  # showed eighty files. One merge commit fixed it, and the next one showed two.
+  #
+  # A back-merge is also the conventional shape: it is how a hotfix on a release branch
+  # reaches development in every branching model that has one. And it makes the merge method
+  # this pull request needs enforceable rather than hoped for -- a head containing a merge
+  # commit is one GitHub will not offer "rebase and merge" for.
+  merge_message="sync: carry ${later} into ${earlier}"
+  if ! git merge --no-ff -m "$merge_message" "refs/remotes/origin/${later}" >/dev/null 2>&1; then
     conflict_files="$(git diff --name-only --diff-filter=U 2>/dev/null | head -n 20 | tr '\n' ' ')"
-    git cherry-pick --abort >/dev/null 2>&1 || true
-    picked=false
-    break
-  done
-
-  if [ "$picked" != true ]; then
-    # Nothing has been pushed: the branch exists in this checkout only, both stages are
+    git merge --abort >/dev/null 2>&1 || true
+    # Nothing has been pushed: the branch exists in this checkout only, and both stages are
     # exactly as they were. No agent is asked to resolve it, for the same reason promotion
-    # does not (T131, FR-034): the only resolution an agent could push is a merge of the
-    # target, and under a replaying merge method that resolution is dropped and the conflict
-    # returns.
+    # does not (T131, FR-034).
     #
     # The hand-off is an annotation and the outcome line rather than an issue comment,
     # because a back-propagation belongs to no issue: what arrived outside the loop had no
     # issue in the loop, which is the whole reason it is here.
-    conflict_subject="$(git log -1 --format=%s "$conflict_sha" 2>/dev/null || true)"
-    note "::error::${later} → ${earlier}: ${conflict_sha:0:8} (${conflict_subject:-no subject}) does not apply onto ${earlier}. Conflicting files: ${conflict_files:-not recorded}. Nothing was pushed; both branches are as they were. Carry it across by hand: branch from ${earlier}, cherry-pick ${conflict_sha:0:8}, resolve, and open a pull request into ${earlier}."
+    note "::error::${later} → ${earlier}: the merge does not apply cleanly. Conflicting files: ${conflict_files:-not recorded}. Nothing was pushed; both branches are as they were. Carry it across by hand: branch from ${earlier}, merge ${later}, resolve, and open a pull request into ${earlier}."
     skipped_because "conflict-handed-off"
     git switch --detach "refs/remotes/origin/${earlier}" >/dev/null 2>&1 || true
     continue
   fi
 
-  # Every pick was empty: the content is present under different shas after all, so there is
-  # nothing to open a pull request about. Asked of the repository rather than counted from
-  # the loop above, because an empty pick is skipped inside it.
-  if [ "$(git rev-parse HEAD)" = "$(git rev-parse "refs/remotes/origin/${earlier}")" ]; then
-    note "Every commit applied empty onto ${earlier}: the content is already there."
+  # `--no-ff` always writes a commit, so "nothing to do" is a tree that did not move rather
+  # than a HEAD that did not move. A merge that changes no file is still worth opening where
+  # the histories have diverged -- that is precisely the merge-base repair -- so this only
+  # skips when the earlier stage already contained the later one.
+  if git merge-base --is-ancestor "refs/remotes/origin/${later}" "refs/remotes/origin/${earlier}"; then
+    note "${earlier} already contains ${later}; nothing to carry."
     skipped_because "stages-aligned"
     git switch --detach "refs/remotes/origin/${earlier}" >/dev/null 2>&1 || true
     continue
@@ -227,11 +220,13 @@ for (( index=${#stages[@]} - 1; index > 0; index-- )); do
 
   git push --force-with-lease origin "HEAD:refs/heads/${sync_branch}"
 
-  body="Carries content from \`${later}\` back to \`${earlier}\`.
+  body="Carries \`${later}\` back into \`${earlier}\`.
 
-A change reached \`${later}\` without coming up the chain -- a hotfix, an administrative push, or a revert -- so \`${earlier}\` does not have it. Until it does, every pull request into \`${earlier}\` carries this delta as well as its own change.
+A change reached \`${later}\` without coming up the chain -- a hotfix, an administrative push, or a revert -- so \`${earlier}\` does not have it. Until it does, every pull request into \`${earlier}\` carries this delta as well as its own change, which trips the protected-files rule and hands work to a person that nobody needed to look at.
 
-Commits carried: ${#to_pick[@]}. Nothing on \`${later}\` was touched, and nothing on \`${earlier}\` is removed by this: it adds the content that is missing and no more.
+Commits missing by content: ${#to_pick[@]}. This is a **merge**, not a replay: the content is only half of it, and the other half is that \`${earlier}\` should contain \`${later}\`'s commits, so that a pull request into \`${earlier}\` diffs against the right point. **Please merge this with a merge commit.** Squashing it would carry the content and leave the histories apart, which is the state this pull request exists to end; GitHub will not offer rebase, because the head is a merge.
+
+Nothing on \`${later}\` was touched, and nothing on \`${earlier}\` is removed by this.
 
 <!-- sync-pr: ${earlier}: ${later} -->"
   new_pr="$(gh pr create --repo "$REPO" --base "$earlier" --head "$sync_branch" \

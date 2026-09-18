@@ -1,11 +1,11 @@
 ---
-# Managed by @plainconceptsplatform/workflows@0.5.1. Source: loops/workflows/agent-apply-review.md. Profile digest: 76d2155c1f82. Update with `workflows update --force`; consumer edits may be overwritten.
+# Managed by @plainconceptsplatform/workflows@0.5.1. Source: loops/workflows/agent-apply-review.md. Profile digest: b005fbfa185f. Update with `workflows update --force`; consumer edits may be overwritten.
 env:
   # Printed by the prompt as the verification block. Consumers set their own commands.
-  VERIFY_COMMANDS: "go build ./... && go test ./..."
-  REPO_RULES: "Run gofmt over anything you change; a build that fails only on formatting wastes a whole run."
-  VERIFY_COMMANDS_SCOPED: "golangci-lint run"
-  LINT_FIX_COMMAND: "golangci-lint run --fix"
+  VERIFY_COMMANDS: "pnpm install --frozen-lockfile && pnpm run build && pnpm run test"
+  REPO_RULES: "Apply only actionable outstanding reviewer feedback to the selected bot pull request. Make minimal changes that address each comment. Preserve architecture and do not weaken tests. Run full verification after changes."
+  VERIFY_COMMANDS_SCOPED: "pnpm run typecheck"
+  LINT_FIX_COMMAND: ""
   REPO_VERIFY_COMMAND: repo-verify
   WORKING_LABEL: bot-working
   REVIEW_LABEL: review
@@ -13,7 +13,7 @@ env:
   REVIEW_MARKER: "<!-- agent-apply-review -->"
   INCOMPLETE_COMMENT: "Automated review feedback ended without an outcome. The issue remains for a retry."
   ISSUE_CONTEXT_PATH: /tmp/gh-aw/agent/issue-context.json
-  GH_AW_ALLOWED_BOTS: "agentic-loop-canary[bot],github-actions[bot]"
+  GH_AW_ALLOWED_BOTS: "personalcorpacc-agentic-loop[bot],github-actions[bot]"
   GIT_AUTHOR_NAME: "github-actions[bot]"
   GIT_AUTHOR_EMAIL: "github-actions[bot]@users.noreply.github.com"
   GIT_COMMITTER_NAME: "github-actions[bot]"
@@ -31,7 +31,7 @@ name: "Agent: Apply Review"
 # This workflow receives the classified inputs and runs rung 3+.
 imports:
   - shared/platform-defaults.md
-  - shared/stack-go.md
+  - shared/stack-node-pnpm.md
 on:
   workflow_call:
     inputs:

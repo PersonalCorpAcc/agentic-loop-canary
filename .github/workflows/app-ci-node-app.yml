@@ -1,5 +1,14 @@
-# Managed by @plainconceptsplatform/workflows@0.5.1. Source: loops/templates/ci/app-ci-go.yml. Profile digest: 76d2155c1f82. Update with `workflows update --force`; consumer edits may be overwritten.
+# Managed by @plainconceptsplatform/workflows@0.5.1. Source: loops/templates/ci/app-ci-node-app.yml. Profile digest: b005fbfa185f. Update with `workflows update --force`; consumer edits may be overwritten.
 name: "CI"
+
+# A single Node application: install, lint, build, test. The other node template
+# (`app-ci-node-monorepo`) is a Next.js workspace with Biome, Stryker and Playwright wired in,
+# which is a fine shape and not the only one -- an adopter with one package and a test script
+# should not have to adopt four tools to get a green check (FR-014).
+#
+# Every command is the profile's. Nothing here knows what the application is, which framework
+# it uses, or whether it has a web build at all: a command the profile does not supply is a
+# step that says so and skips.
 
 on:
   pull_request:
@@ -7,11 +16,8 @@ on:
     - cron: "0 6 * * 1"
   workflow_dispatch:
 
-# Toolchain pins only. The Go version comes from the repository's own go.mod, and every
-# command below is the profile's: the pack's plain toolchain commands unless a project
-# overrides them. Nothing here knows what the application is (FR-014).
 env:
-  GOLANGCI_LINT_VERSION: "v2.12.2"
+  NODE_VERSION: "22"
 
 permissions:
   contents: read
@@ -29,51 +35,44 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      - uses: actions/setup-go@d35c59abb061a4a6fb18e82ac0862c26744d6ab5 # v5.5.0
+      - uses: pnpm/action-setup@f40ffcd9367d9f12939873eb1018b921a783ffaa # v4
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
-          go-version-file: go.mod
-          cache: true
+          node-version: "${{ env.NODE_VERSION }}"
+          cache: pnpm
       - name: Install dependencies
         env:
-          COMMAND: "go mod download"
+          COMMAND: "pnpm install --frozen-lockfile"
         run: |
           set -euo pipefail
           [ -n "$COMMAND" ] || { echo "No install command in the profile; skipping."; exit 0; }
           eval "$COMMAND"
-      - name: Install golangci-lint
-        # Pinned by version through the module proxy, whose checksum database verifies it.
-        env:
-          COMMAND: "golangci-lint run"
-        run: |
-          set -euo pipefail
-          [ -n "$COMMAND" ] || { echo "No lint command in the profile; skipping."; exit 0; }
-          go install "github.com/golangci/golangci-lint/v2/cmd/golangci-lint@${GOLANGCI_LINT_VERSION}"
       - name: Lint
         env:
-          COMMAND: "golangci-lint run"
+          COMMAND: "pnpm run typecheck"
         run: |
           set -euo pipefail
           [ -n "$COMMAND" ] || { echo "No lint command in the profile; skipping."; exit 0; }
           eval "$COMMAND"
       - name: Build
         env:
-          COMMAND: "go build ./..."
+          COMMAND: "pnpm run build"
         run: |
           set -euo pipefail
           [ -n "$COMMAND" ] || { echo "No build command in the profile; skipping."; exit 0; }
           eval "$COMMAND"
       - name: Test
         env:
-          COMMAND: "go test ./..."
+          COMMAND: "pnpm run test"
         run: |
           set -euo pipefail
           [ -n "$COMMAND" ] || { echo "No test command in the profile; skipping."; exit 0; }
           eval "$COMMAND"
 
-  # Branch protection selects a required status check by check-run name, which is a job's
-  # name and not a workflow's. This job is that check: it runs whatever happened above,
-  # depends on every job the verdict is made of, and fails if any of them did (FR-068). The
-  # gate reads the same name, so the two cannot disagree about "CI passed".
+  # Branch protection selects a required status check by check-run name, which is a job's name
+  # and not a workflow's. This job is that check: it depends on every job the verdict is made
+  # of and fails if any of them did (FR-068). The gate reads the same name, so the two cannot
+  # disagree about "CI passed".
   ci:
     name: "CI"
     needs: [test]
@@ -94,15 +93,9 @@ jobs:
           echo "Every required job succeeded."
 
   # A bot pull request is opened with GITHUB_TOKEN, and GitHub delivers no workflow_run event
-  # for the CI runs that follow (the run's actor is the bot). The router's CI-completion route
-  # never sees them, so this job hands the verdict over from inside CI. workflow_dispatch is
-  # one of the two events GITHUB_TOKEN may raise, so no App token is needed here, and the
-  # router treats a dispatch as trusted. Human pull requests are left to the workflow_run
-  # route, which does fire for them. The reconcile belt remains the hourly fallback.
-  #
-  # If a deploy pipeline calls this workflow with `uses:`, that caller must also grant
-  # `actions: write`. A called workflow may not request a scope its caller withheld, and the
-  # whole run fails to start with zero jobs and no annotation when it does.
+  # for the CI runs that follow. The router's CI-completion route never sees them, so this job
+  # hands the verdict over from inside CI. workflow_dispatch is one of the two events
+  # GITHUB_TOKEN may raise, so no App token is needed here.
   dispatch-merge-gate:
     name: Dispatch merge gate
     needs: [test]
@@ -118,8 +111,6 @@ jobs:
       contents: read
       actions: write
     steps:
-      # The hand-off lives in one composite action shared by every CI template (FR-014). A
-      # composite has no needs context, so the verdict's inputs are computed here and passed in.
       - name: Checkout workflow actions
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -130,9 +121,5 @@ jobs:
           results: ${{ join(needs.*.result, ' ') }}
           pr-number: ${{ github.event.pull_request.number }}
           run-id: ${{ github.run_id }}
-          # The repository default branch, deliberately, and not the profile's branch point: a
-          # dispatch runs the workflow file at the ref it names, and every event-triggered run
-          # executes the default-branch copy, so a dispatch at `cutFrom` would run whatever
-          # router that branch happens to hold. Under a chain that is a stale one (FR-025).
           ref: ${{ github.event.repository.default_branch }}
           token: ${{ github.token }}

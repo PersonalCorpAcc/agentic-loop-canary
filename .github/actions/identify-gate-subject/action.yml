@@ -1,4 +1,4 @@
-# Managed by @plainconceptsplatform/workflows@0.5.1. Source: loops/actions/identify-gate-subject/action.yml. Profile digest: 76d2155c1f82. Update with workflows update --force; consumer edits may be overwritten.
+# Managed by @plainconceptsplatform/workflows@0.5.1. Source: loops/actions/identify-gate-subject/action.yml. Profile digest: b005fbfa185f. Update with workflows update --force; consumer edits may be overwritten.
 name: Identify gate subject
 description: Confirm the pull request is one we authored, resolve the issue it closes, and check that issue carries the required label.
 inputs:
@@ -32,6 +32,13 @@ outputs:
   found:
     description: Whether a valid gate subject was found.
     value: ${{ steps.identify.outputs.found }}
+  why-not:
+    description: >
+      One sentence saying which condition this pull request failed, when it failed one.
+      Empty when a subject was found. The alternative is a caller listing every condition it
+      might have been, which for a pull request this loop did open reads as a denial that it
+      did (FR-084).
+    value: ${{ steps.identify.outputs.why-not }}
   pr:
     description: Pull request number.
     value: ${{ steps.identify.outputs.pr }}
@@ -69,7 +76,10 @@ runs:
         set -euo pipefail
 
         none() {
-          echo "found=false" >> "$GITHUB_OUTPUT"
+          {
+            echo "found=false"
+            echo "why-not=$1"
+          } >>"$GITHUB_OUTPUT"
           echo "$1"
           exit 0
         }
@@ -97,7 +107,7 @@ runs:
           issue="$(pr_issue "$PR_NUMBER")"
         fi
 
-        [ -n "$issue" ] || none "PR #$PR_NUMBER does not close a numbered issue"
+        [ -n "$issue" ] || none "PR #$PR_NUMBER belongs to no issue, so there is nothing to assess it against. A pull request this loop opens without one -- a stage synchronisation, say -- is a person's to merge."
 
         # Which label this pull request's base demands. The map wins where it has an entry,
         # because it knows the difference between the first stage and the fourth; the single

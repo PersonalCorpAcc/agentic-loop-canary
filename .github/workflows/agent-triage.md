@@ -1,7 +1,7 @@
 ---
-# Managed by @plainconceptsplatform/workflows@0.5.1. Source: loops/workflows/agent-triage.md. Profile digest: 76d2155c1f82. Update with `workflows update --force`; consumer edits may be overwritten.
+# Managed by @plainconceptsplatform/workflows@0.5.1. Source: loops/workflows/agent-triage.md. Profile digest: b005fbfa185f. Update with `workflows update --force`; consumer edits may be overwritten.
 env:
-  REPO_RULES: "Run gofmt over anything you change; a build that fails only on formatting wastes a whole run."
+  REPO_RULES: "Triage issues opened by outside collaborators. Assess template completeness, security risk, change size, danger level, duplicates, clarity, reproducibility, acceptance criteria, and cross-cutting impact. Do not implement code. Do not modify the issue body."
   TRIAGE_LABEL: triage
   WORKING_LABEL: bot-working
   REVIEW_LABEL: review
@@ -12,7 +12,7 @@ env:
   SAFE_OUTPUT_COMMENT_PREFIX: "Triage assessment"
   ISSUE_CONTEXT_PATH: /tmp/gh-aw/agent/issue-context.json
   OPEN_ISSUES_PATH: /tmp/gh-aw/agent/open-issues.json
-  GH_AW_ALLOWED_BOTS: "agentic-loop-canary[bot],github-actions[bot]"
+  GH_AW_ALLOWED_BOTS: "personalcorpacc-agentic-loop[bot],github-actions[bot]"
   GIT_AUTHOR_NAME: "github-actions[bot]"
   GIT_AUTHOR_EMAIL: "github-actions[bot]@users.noreply.github.com"
   GIT_COMMITTER_NAME: "github-actions[bot]"
@@ -35,7 +35,7 @@ name: "Agent: Triage Issue"
 
 imports:
   - shared/platform-defaults.md
-  - shared/stack-go.md
+  - shared/stack-node-pnpm.md
 on:
   workflow_call:
     inputs:
