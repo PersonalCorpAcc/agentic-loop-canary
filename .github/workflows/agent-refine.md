@@ -1,7 +1,7 @@
 ---
-# Managed by @plainconceptsplatform/workflows@0.5.1. Source: loops/workflows/agent-refine.md. Profile digest: 76d2155c1f82. Update with `workflows update --force`; consumer edits may be overwritten.
+# Managed by @plainconceptsplatform/workflows@0.5.1. Source: loops/workflows/agent-refine.md. Profile digest: b005fbfa185f. Update with `workflows update --force`; consumer edits may be overwritten.
 env:
-  REPO_RULES: "Run gofmt over anything you change; a build that fails only on formatting wastes a whole run."
+  REPO_RULES: "Refine only the selected issue into a grounded, implementation-ready user story. Read repository documentation for domain context. Write acceptance criteria that match existing patterns. Do not implement code."
   PLAN_EXPLORE_SKILL: plan-explore
   PLAN_STORY_SKILL: plan-story
   PLAN_STORY_COMMAND: plan-story
@@ -23,7 +23,7 @@ env:
   INCOMPLETE_COMMENT: "Automated refinement ended without an outcome. The refine label remains for a retry."
   SAFE_OUTPUT_COMMENT_PREFIX: "Refinement update"
   ISSUE_CONTEXT_PATH: /tmp/gh-aw/agent/issue-context.json
-  GH_AW_ALLOWED_BOTS: "agentic-loop-canary[bot],github-actions[bot]"
+  GH_AW_ALLOWED_BOTS: "personalcorpacc-agentic-loop[bot],github-actions[bot]"
   REFINE_ISSUE_PATH: /tmp/gh-aw/refine-issue.json
   REFINE_COMMENTS_PATH: /tmp/gh-aw/refine-comments.json
   GIT_AUTHOR_NAME: "github-actions[bot]"
@@ -49,7 +49,7 @@ name: "Agent: Refine Issue"
 
 imports:
   - shared/platform-defaults.md
-  - shared/stack-go.md
+  - shared/stack-node-pnpm.md
 on:
   workflow_call:
     inputs:
