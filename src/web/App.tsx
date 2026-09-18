@@ -15,7 +15,7 @@ export function App(): ReactElement {
   const [live, setLive] = useState(false);
 
   useEffect(() => {
-    const socket = new WebSocket(`ws://${location.hostname}:8787/events`);
+    const socket = new WebSocket(socketUrl(location));
     socket.addEventListener("open", () => setLive(true));
     socket.addEventListener("close", () => setLive(false));
     socket.addEventListener("message", (message) => {
@@ -51,6 +51,21 @@ export function App(): ReactElement {
       </ol>
     </main>
   );
+}
+
+/**
+ * The socket's address, from the page's own.
+ *
+ * `wss:` when the page is https, or the browser refuses it as mixed content -- which is every
+ * deployment behind TLS, and none of local development, so it is exactly the kind of thing
+ * that works everywhere it is tested and fails where it is used.
+ */
+export function socketUrl(from: Pick<Location, "protocol" | "host" | "hostname">): string {
+  const scheme = from.protocol === "https:" ? "wss:" : "ws:";
+  // Locally the API runs on its own port beside Vite; in a deployment one process serves
+  // both, so the page's host is the right answer.
+  const host = from.host.includes(":5173") ? `${from.hostname}:8787` : from.host;
+  return `${scheme}//${host}/events`;
 }
 
 /** Attention first, then unfinished, then newest. */
