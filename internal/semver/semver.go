@@ -93,6 +93,11 @@ func Compare(a, b Version) int {
 	}
 }
 
+// IsPrerelease reports whether v carries a pre-release identifier.
+func IsPrerelease(v Version) bool {
+	return v.PreRelease != ""
+}
+
 func compareInt(a, b int) int {
 	switch {
 	case a < b:
