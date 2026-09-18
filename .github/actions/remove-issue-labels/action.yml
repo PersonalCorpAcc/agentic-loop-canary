@@ -1,4 +1,4 @@
-# Managed by @plainconceptsplatform/workflows@0.5.1. Source: loops/actions/remove-issue-labels/action.yml. Profile digest: bac61e5585d7. Update with workflows update --force; consumer edits may be overwritten.
+# Managed by @plainconceptsplatform/workflows@0.5.1. Source: loops/actions/remove-issue-labels/action.yml. Profile digest: ca96e80f128f. Update with workflows update --force; consumer edits may be overwritten.
 name: Remove issue labels
 description: Remove one or more labels from an issue or pull request.
 inputs:
