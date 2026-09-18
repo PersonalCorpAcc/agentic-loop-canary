@@ -1,4 +1,4 @@
-# Managed by @plainconceptsplatform/workflows@0.5.1. Source: loops/actions/cleanup-artifacts/action.yml. Profile digest: bac61e5585d7. Update with workflows update --force; consumer edits may be overwritten.
+# Managed by @plainconceptsplatform/workflows@0.5.1. Source: loops/actions/cleanup-artifacts/action.yml. Profile digest: ca96e80f128f. Update with workflows update --force; consumer edits may be overwritten.
 name: Clean up artifacts
 description: Delete workflow artifacts older than the configured retention period.
 inputs:

@@ -169,7 +169,11 @@ crons:
   audit: off
   auditClose: off
   cleanupArtifacts: off
-  reconcileBotPrRuns: off
+  # The one clock that stays on. It is the belt that rescues a bot pull request nothing
+  # else can reach -- a conflicting one gets no merge ref, so `pull_request` CI never runs
+  # on it, so the gate is never dispatched and the change sits for ever. Observed on PR #37,
+  # 18/09/2026, with every clock off.
+  reconcileBotPrRuns: "17 * * * *"
   promote: off
   syncStages: off
 
