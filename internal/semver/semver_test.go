@@ -87,3 +87,35 @@ func TestCompare(t *testing.T) {
 		}
 	}
 }
+
+func TestCompareStrings(t *testing.T) {
+	cases := []struct {
+		name    string
+		a, b    string
+		want    int
+		wantErr bool
+	}{
+		{name: "less than", a: "1.2.3", b: "1.2.4", want: -1},
+		{name: "equal", a: "1.2.3", b: "1.2.3", want: 0},
+		{name: "greater than", a: "1.2.4", b: "1.2.3", want: 1},
+		{name: "invalid a", a: "not-a-version", b: "1.2.3", wantErr: true},
+		{name: "invalid b", a: "1.2.3", b: "not-a-version", wantErr: true},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			got, err := CompareStrings(c.a, c.b)
+			if c.wantErr {
+				if err == nil {
+					t.Fatalf("CompareStrings(%q, %q) returned nil error, want an error", c.a, c.b)
+				}
+				return
+			}
+			if err != nil {
+				t.Fatalf("CompareStrings(%q, %q) returned unexpected error: %v", c.a, c.b, err)
+			}
+			if got != c.want {
+				t.Errorf("CompareStrings(%q, %q) = %d, want %d", c.a, c.b, got, c.want)
+			}
+		})
+	}
+}
