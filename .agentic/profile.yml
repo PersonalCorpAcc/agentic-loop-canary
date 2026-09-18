@@ -102,6 +102,22 @@ branching:
     mode: always
     targets: [dev, test, main]
 
+# What the forge is asked to enforce, which is a different thing from what the loop does
+# (FR-085). Rendered by `workflows protection`, applied by a person, and checked by
+# `doctor --forge`. Nothing reads it at run time.
+#
+# A team, because that is the one rule a GitHub App cannot satisfy: an App can submit an
+# approving review and satisfy "require one approval", and this loop's own App did exactly
+# that on 18/09/2026. It cannot join a team.
+protection:
+  reviewers:
+    - team: agentic-team
+      approvals: 1
+      stages: [test, main]
+    - team: agentic-team
+      approvals: 1
+      paths: [".github/**"]
+
 changelog:
   path: CHANGELOG.json
 
