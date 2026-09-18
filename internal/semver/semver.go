@@ -93,6 +93,22 @@ func Compare(a, b Version) int {
 	}
 }
 
+// CompareStrings parses a and b and returns -1, 0 or 1 depending on whether
+// a is less than, equal to, or greater than b. It returns an error if either
+// string does not parse, so callers can sort raw version strings without
+// parsing them first.
+func CompareStrings(a, b string) (int, error) {
+	va, err := Parse(a)
+	if err != nil {
+		return 0, err
+	}
+	vb, err := Parse(b)
+	if err != nil {
+		return 0, err
+	}
+	return Compare(va, vb), nil
+}
+
 func compareInt(a, b int) int {
 	switch {
 	case a < b:
