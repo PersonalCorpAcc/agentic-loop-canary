@@ -12,7 +12,7 @@ import type { LoopRun } from "../shared/types.js";
  * knows -- route, timing, conclusion -- and an issue tracks the rest.
  */
 
-const repo = process.env["LOOP_REPO"] ?? "PersonalCorpAcc/agentic-loop-canary";
+export const repo = process.env["LOOP_REPO"] ?? "PersonalCorpAcc/agentic-loop-canary";
 const token = process.env["GH_TOKEN"] ?? process.env["GITHUB_TOKEN"] ?? "";
 
 interface ApiRun {

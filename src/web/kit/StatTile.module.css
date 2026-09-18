@@ -1,0 +1,29 @@
+.tile {
+  display: inline-flex;
+  flex-direction: column;
+  gap: var(--space-2xs);
+  padding: var(--space-sm) var(--space-md);
+  border-radius: var(--radius-md);
+  border: 1px solid var(--colour-border);
+  background: var(--colour-surface);
+}
+
+.value {
+  font-size: 2rem;
+  font-weight: 700;
+  line-height: 1;
+}
+
+.label {
+  font-size: 0.85rem;
+  color: var(--colour-text-muted);
+}
+
+.attention {
+  border-color: var(--colour-attention);
+  background: var(--colour-attention-bg);
+}
+
+.attention .value {
+  color: var(--colour-attention);
+}

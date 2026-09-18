@@ -27,7 +27,7 @@ export interface LoopRun {
 
 /** What the server pushes over the socket as runs begin and end. */
 export type LoopEvent =
-  | { readonly kind: "snapshot"; readonly runs: readonly LoopRun[] }
+  | { readonly kind: "snapshot"; readonly repo: string; readonly runs: readonly LoopRun[] }
   | { readonly kind: "run"; readonly run: LoopRun };
 
 export const outcomes: readonly Outcome[] = ["acted", "no-action", "handed-to-human", "failed"];

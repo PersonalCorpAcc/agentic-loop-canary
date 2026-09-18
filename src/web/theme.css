@@ -1,0 +1,42 @@
+/**
+ * The theme: every colour the app uses, defined once. Nothing outside this file names a
+ * colour literal -- a component reaches for `var(--colour-...)`, never a hex code, so a
+ * palette change is a diff to one file rather than a search-and-replace across the kit.
+ */
+:root {
+  --colour-bg: #0b1220;
+  --colour-surface: #131c30;
+  --colour-surface-raised: #1a2540;
+  --colour-border: #263252;
+  --colour-text: #e7ecf7;
+  --colour-text-muted: #93a1c2;
+  --colour-accent: #5b8cff;
+  --colour-live: #35d399;
+  --colour-attention: #ff6b6b;
+  --colour-attention-bg: #3a1f24;
+  --colour-neutral-bg: #1e2a44;
+
+  --radius-sm: 6px;
+  --radius-md: 12px;
+  --space-2xs: 4px;
+  --space-xs: 8px;
+  --space-sm: 12px;
+  --space-md: 20px;
+  --space-lg: 32px;
+  --font-sans: system-ui, -apple-system, "Segoe UI", sans-serif;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  background: var(--colour-bg);
+  color: var(--colour-text);
+  font-family: var(--font-sans);
+}
+
+a {
+  color: var(--colour-accent);
+}
