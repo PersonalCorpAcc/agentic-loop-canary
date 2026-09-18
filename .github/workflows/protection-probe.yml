@@ -94,13 +94,14 @@ jobs:
         run: |
           set -euo pipefail
           # Authored by the App, so a person can approve it: GitHub refuses to let anyone
-          # approve their own pull request, and the point of this probe is the human review.
+          # approve their own pull request, and the human review is the point of this probe.
           branch="probe-auto-${GITHUB_RUN_ID}"
           sha="$(gh api "repos/${REPO}/git/ref/heads/${BASE}" --jq .object.sha)"
           gh api --method POST "repos/${REPO}/git/refs" -f ref="refs/heads/${branch}" -f sha="$sha" --jq .ref
-          gh api --method PUT "repos/${REPO}/contents/PROBE-AUTO.txt"             -f message="probe: a change for the auto-merge chain"             -f content="$(printf 'auto
-' | base64 -w0)"             -f branch="$branch" --jq .commit.sha
-          gh pr create --repo "$REPO" --base "$BASE" --head "$branch"             --title "T219 probe: auto-merge waits for a human review"             --body "Temporary. Arms auto-merge as the App under a ruleset requiring one review, then waits for a person."
+          # base64 of "auto\n", written out rather than piped: an escape in a heredoc
+          # arrives changed often enough that this package has a rule about it.
+          gh api --method PUT "repos/${REPO}/contents/PROBE-AUTO.txt" -f message="probe: a change for the auto-merge chain" -f content="YXV0bwo=" -f branch="$branch" --jq .commit.sha
+          gh pr create --repo "$REPO" --base "$BASE" --head "$branch" --title "T219 probe: auto-merge waits for a human review" --body "Temporary. Arms auto-merge as the App under a ruleset requiring one review, then waits for a person."
 
       - name: Which rules does the forge say apply, as the App
         if: inputs.operation == 'rules'
