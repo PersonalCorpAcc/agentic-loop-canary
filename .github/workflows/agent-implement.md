@@ -1,5 +1,5 @@
 ---
-# Managed by @plainconceptsplatform/workflows@0.5.1. Source: loops/workflows/agent-implement.md. Profile digest: 76d2155c1f82. Update with `workflows update --force`; consumer edits may be overwritten.
+# Managed by @plainconceptsplatform/workflows@0.5.1. Source: loops/workflows/agent-implement.md. Profile digest: beaf94f47bcb. Update with `workflows update --force`; consumer edits may be overwritten.
 env:
   VERIFY_COMMANDS: "go build ./... && go test ./..."
   REPO_RULES: "Run gofmt over anything you change; a build that fails only on formatting wastes a whole run."
@@ -43,7 +43,7 @@ env:
   # The branch the work is cut from. Equal to the base under trunk, and a different
   # branch under a chain, which is what the base-rewrite check turns on (FR-061).
   BRANCH_POINT: "main"
-  GH_AW_ALLOWED_BOTS: "agentic-loop-canary[bot],github-actions[bot]"
+  GH_AW_ALLOWED_BOTS: "personalcorpacc-agentic-loop[bot],github-actions[bot]"
 description: |
   Implements an issue and opens a pull request. Stops there: the merge decision belongs to
   `agent-merge-gate.md`, which runs once CI has reported. Replaces the `impl-*` chain in
@@ -141,7 +141,7 @@ jobs:
         with:
           token: ${{ github.token }}
           issue-number: ${{ inputs.issue-number }}
-          bot-login: agentic-loop-canary[bot]
+          bot-login: personalcorpacc-agentic-loop[bot]
       - name: Stop if this issue already has an open pull request
         id: duplicate
         if: steps.check.outputs.eligible == 'true'

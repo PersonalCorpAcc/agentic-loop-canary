@@ -1,5 +1,5 @@
 ---
-# Managed by @plainconceptsplatform/workflows@0.5.1. Source: loops/workflows/agent-apply-review.md. Profile digest: 76d2155c1f82. Update with `workflows update --force`; consumer edits may be overwritten.
+# Managed by @plainconceptsplatform/workflows@0.5.1. Source: loops/workflows/agent-apply-review.md. Profile digest: beaf94f47bcb. Update with `workflows update --force`; consumer edits may be overwritten.
 env:
   # Printed by the prompt as the verification block. Consumers set their own commands.
   VERIFY_COMMANDS: "go build ./... && go test ./..."
@@ -13,7 +13,7 @@ env:
   REVIEW_MARKER: "<!-- agent-apply-review -->"
   INCOMPLETE_COMMENT: "Automated review feedback ended without an outcome. The issue remains for a retry."
   ISSUE_CONTEXT_PATH: /tmp/gh-aw/agent/issue-context.json
-  GH_AW_ALLOWED_BOTS: "agentic-loop-canary[bot],github-actions[bot]"
+  GH_AW_ALLOWED_BOTS: "personalcorpacc-agentic-loop[bot],github-actions[bot]"
   GIT_AUTHOR_NAME: "github-actions[bot]"
   GIT_AUTHOR_EMAIL: "github-actions[bot]@users.noreply.github.com"
   GIT_COMMITTER_NAME: "github-actions[bot]"

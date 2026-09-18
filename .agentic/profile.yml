@@ -44,7 +44,7 @@ llm:
 # derives from the App's name: an App named "Agentic Loop Canary" logs in as
 # `agentic-loop-canary[bot]`.
 bot:
-  appLogin: agentic-loop-canary[bot]
+  appLogin: personalcorpacc-agentic-loop[bot]
   appIdSecret: BOT_APP_ID
   keySecret: BOT_PRIVATE_KEY
 

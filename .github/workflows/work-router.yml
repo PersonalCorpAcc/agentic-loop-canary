@@ -1,4 +1,4 @@
-# Managed by @plainconceptsplatform/workflows@0.5.1. Source: loops/workflows/work-router.yml. Profile digest: 76d2155c1f82. Update with `workflows update --force`; consumer edits may be overwritten.
+# Managed by @plainconceptsplatform/workflows@0.5.1. Source: loops/workflows/work-router.yml. Profile digest: beaf94f47bcb. Update with `workflows update --force`; consumer edits may be overwritten.
 name: "All Work Router"
 
 # Owns every repository automation trigger. Classifies each event into exactly one route,
@@ -285,7 +285,7 @@ jobs:
           # Platform bot owns Safe Outputs. Its label changes must be able to
           # start the follow-on worker, even though GitHub does not report it
           # as a repository collaborator.
-          if [ "$ACTOR" = "github-actions[bot]" ] || [ "$ACTOR" = "agentic-loop-canary[bot]" ]; then
+          if [ "$ACTOR" = "github-actions[bot]" ] || [ "$ACTOR" = "personalcorpacc-agentic-loop[bot]" ]; then
             echo "trusted=true" >> "$GITHUB_OUTPUT"
             echo "is_outside_collaborator=false" >> "$GITHUB_OUTPUT"
             exit 0
@@ -759,7 +759,7 @@ jobs:
     needs: classify
     if: >
       needs.classify.outputs.route == 'bot-approve' &&
-        (github.actor == 'app/github-actions' || github.actor == 'agentic-loop-canary[bot]')
+        (github.actor == 'app/github-actions' || github.actor == 'personalcorpacc-agentic-loop[bot]')
     runs-on: ubuntu-latest
     timeout-minutes: 5
     permissions:
@@ -1302,7 +1302,7 @@ jobs:
               # so it has to be pointed at stdout to be read here. Otherwise this captures
               # nothing and quietly writes three keys into the job's own outputs.
               linked_pr=$(GITHUB_OUTPUT=/dev/stdout GH_TOKEN="$GH_TOKEN" REPO="$REPO" ISSUE_NUMBER="$issue" \
-                BOT_LOGIN="agentic-loop-canary[bot]" \
+                BOT_LOGIN="personalcorpacc-agentic-loop[bot]" \
                 bash ./.github/actions/resolve-change-linkage/resolve-change-linkage.sh 2>/dev/null |
                 sed -n 's/^pr=//p' | head -1)
               if [ -n "${linked_pr:-}" ]; then
@@ -1321,7 +1321,7 @@ jobs:
             jq -r --arg repo "$REPO" '
               .[]
               | select(
-                    (.user.login == "github-actions[bot]" or .user.login == "app/github-actions" or .user.login == "agentic-loop-canary[bot]")
+                    (.user.login == "github-actions[bot]" or .user.login == "app/github-actions" or .user.login == "personalcorpacc-agentic-loop[bot]")
                     and .draft == false
                     and .head.repo.full_name == $repo
                  )
