@@ -25,6 +25,7 @@ on:
           - auto
           - rules
           - open
+          - trigger
 
 permissions:
   contents: read
@@ -83,6 +84,42 @@ jobs:
           for _ in 1 2 3; do
             sleep 20
             gh pr view "$PR" --repo "$REPO" --json state,mergeStateStatus,autoMergeRequest               --jq '{state, mergeStateStatus, auto: (.autoMergeRequest != null)}'
+          done
+
+      - name: Push an empty commit with the CI trigger token
+        if: inputs.operation == 'trigger'
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+          TRIGGER_TOKEN: ${{ secrets.GH_AW_CI_TRIGGER_TOKEN }}
+          REPO: ${{ github.repository }}
+          PR: ${{ inputs.pr-number }}
+        run: |
+          set -euo pipefail
+          [ -n "$TRIGGER_TOKEN" ] || { echo "::error::GH_AW_CI_TRIGGER_TOKEN is not set on this repository."; exit 1; }
+          branch="$(gh pr view "$PR" --repo "$REPO" --json headRefName --jq .headRefName)"
+          before="$(gh pr view "$PR" --repo "$REPO" --json headRefOid --jq .headRefOid)"
+          echo "PR #${PR} head ${branch} at ${before}"
+
+          # The same thing the framework does after opening a pull request: an empty commit
+          # pushed by an identity that is not GITHUB_TOKEN, because GitHub does not start
+          # workflows for events that token raises.
+          git clone --quiet --branch "$branch" "https://x-access-token:${TRIGGER_TOKEN}@github.com/${REPO}.git" probe-clone
+          cd probe-clone
+          git config user.name "ci-trigger-probe"
+          git config user.email "ci-trigger-probe@users.noreply.github.com"
+          git commit --quiet --allow-empty -m "probe: empty commit to start CI"
+          git push --quiet origin "$branch"
+          after="$(git rev-parse HEAD)"
+          echo "pushed ${after}"
+
+          # Ask again once the forge has had time to start something. A query that returns
+          # nothing seconds after a push is not evidence that nothing will run.
+          for attempt in 1 2 3 4 5 6; do
+            sleep 20
+            runs="$(gh api "repos/${REPO}/actions/runs?head_sha=${after}&per_page=20" \
+              --jq '[.workflow_runs[] | {name, event, status, actor: .actor.login, triggering: .triggering_actor.login}]')"
+            echo "attempt ${attempt}: ${runs}"
+            [ "$runs" = "[]" ] || break
           done
 
       - name: Open a pull request as the App
