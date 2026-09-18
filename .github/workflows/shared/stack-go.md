@@ -1,5 +1,5 @@
 ---
-# Managed by @plainconceptsplatform/workflows@0.5.1. Source: loops/stacks/go/pack.yml. Profile digest: 76d2155c1f82. Update with `workflows update --force`; consumer edits may be overwritten.
+# Managed by @plainconceptsplatform/workflows@0.5.1. Source: loops/stacks/go/pack.yml. Profile digest: beaf94f47bcb. Update with `workflows update --force`; consumer edits may be overwritten.
 network:
   allowed:
     - defaults
