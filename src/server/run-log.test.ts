@@ -10,6 +10,11 @@ function jobsResponse(jobId: number): Response {
   return new Response(JSON.stringify({ jobs: [{ id: jobId }] }), { status: 200 });
 }
 
+/** A router run's jobs list -- several jobs, in the order the forge reports them. */
+function multiJobsResponse(jobIds: number[]): Response {
+  return new Response(JSON.stringify({ jobs: jobIds.map((id) => ({ id })) }), { status: 200 });
+}
+
 function logResponse(body: string, status = 200): Response {
   return new Response(body, { status });
 }
@@ -37,6 +42,22 @@ describe("reading a run's outcome from its own log", () => {
 
     expect(outcome).toMatchObject({ outcome: "acted", route: "merge-gate", subject: "#25", reason: "merge-armed" });
     expect(fetchMock).toHaveBeenCalledTimes(2);
+  });
+
+  it("finds the outcome line on the last job of a router run, not just the first", async () => {
+    const fetchMock = vi.mocked(fetch);
+    fetchMock
+      .mockResolvedValueOnce(multiJobsResponse([201, 202, 203]))
+      .mockResolvedValueOnce(logResponse("Run bash route.sh\nRouted to conclude.\n"))
+      .mockResolvedValueOnce(logResponse("Run bash worker.sh\nDid the work.\n"))
+      .mockResolvedValueOnce(logResponse(
+        "outcome=acted route=merge-gate subject=#25 reason=merge-armed -- The pull request is marked ready.\n",
+      ));
+
+    const outcome = await outcomeFor(6);
+
+    expect(outcome).toMatchObject({ outcome: "acted", route: "merge-gate", reason: "merge-armed" });
+    expect(fetchMock).toHaveBeenCalledTimes(4);
   });
 
   it("keeps a run whose log has no outcome line, rather than dropping it", async () => {

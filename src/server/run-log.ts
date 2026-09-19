@@ -25,22 +25,40 @@ interface ApiJob {
   readonly id: number;
 }
 
-/** The plain-text log of a run's first job -- the outcome line's writer, in this loop. */
-async function fetchLog(runId: number): Promise<string> {
+async function fetchJobs(runId: number): Promise<ApiJob[]> {
   const jobsResponse = await fetch(`https://api.github.com/repos/${repo}/actions/runs/${runId}/jobs`, {
     headers: headers(),
   });
   if (!jobsResponse.ok) throw new Error(`the forge answered ${jobsResponse.status}`);
 
   const body = await jobsResponse.json() as { jobs?: ApiJob[] };
-  const job = (body.jobs ?? [])[0];
-  if (job === undefined) throw new Error(`run ${runId} has no job`);
+  return body.jobs ?? [];
+}
 
-  const logResponse = await fetch(`https://api.github.com/repos/${repo}/actions/jobs/${job.id}/logs`, {
+async function fetchJobLog(jobId: number): Promise<string> {
+  const logResponse = await fetch(`https://api.github.com/repos/${repo}/actions/jobs/${jobId}/logs`, {
     headers: headers(),
   });
   if (!logResponse.ok) throw new Error(`the forge answered ${logResponse.status}`);
   return await logResponse.text();
+}
+
+/**
+ * The run's outcome line, searched for across its jobs.
+ *
+ * The line's writer is whichever job records it -- for a worker call that is `conclude`, the
+ * last job, not the first -- so jobs are checked in order and the search stops as soon as one
+ * log has the line, rather than assuming a fixed position.
+ */
+async function findOutcome(runId: number): Promise<OutcomeLine | undefined> {
+  const jobs = await fetchJobs(runId);
+  if (jobs.length === 0) throw new Error(`run ${runId} has no job`);
+
+  for (const job of jobs) {
+    const outcome = outcomeOf(await fetchJobLog(job.id));
+    if (outcome !== undefined) return outcome;
+  }
+  return undefined;
 }
 
 // Keyed by run id. A run present in this map has been fetched and parsed already, even where
@@ -57,10 +75,12 @@ const cache = new Map<number, OutcomeLine | undefined>();
 export async function outcomeFor(runId: number): Promise<OutcomeLine | undefined> {
   if (cache.has(runId)) return cache.get(runId);
 
-  const log = await fetchLog(runId).catch(() => undefined);
-  if (log === undefined) return undefined;
-
-  const outcome = outcomeOf(log);
+  let outcome: OutcomeLine | undefined;
+  try {
+    outcome = await findOutcome(runId);
+  } catch {
+    return undefined;
+  }
   cache.set(runId, outcome);
   return outcome;
 }
