@@ -1,4 +1,5 @@
 import type { LoopRun } from "../shared/types.js";
+import { outcomeFor } from "./run-log.js";
 
 /**
  * The loop's runs, from the forge.
@@ -7,9 +8,9 @@ import type { LoopRun } from "../shared/types.js";
  * A token is used when one is present, because the rate limit without one is 60 requests an
  * hour and this polls.
  *
- * What it cannot do yet: read each run's outcome line. That lives in the job log, which is a
- * second request per run and a zip to unpack, so the first version shows what the run list
- * knows -- route, timing, conclusion -- and an issue tracks the rest.
+ * A completed run's outcome, reason and subject come from its own outcome line (run-log.ts)
+ * when that line can be read; the conclusion and title are the fallback for a run whose log
+ * has no line, or whose log could not be fetched, so a run is never dropped for that reason.
  */
 
 const repo = process.env["LOOP_REPO"] ?? "PersonalCorpAcc/agentic-loop-canary";
@@ -46,13 +47,17 @@ export async function listRuns(limit = 50): Promise<LoopRun[]> {
   if (!response.ok) throw new Error(`the forge answered ${response.status}`);
 
   const body = await response.json() as { workflow_runs?: ApiRun[] };
-  return (body.workflow_runs ?? []).map((run) => ({
+  return Promise.all((body.workflow_runs ?? []).map((run) => toLoopRun(run)));
+}
+
+async function toLoopRun(run: ApiRun): Promise<LoopRun> {
+  // The run list alone does not carry the loop's own outcome line, so a finished run is
+  // described by its conclusion and title until its log says otherwise. `unknown` is honest;
+  // inventing `acted` from `success` would not be, because a successful run that decided to
+  // do nothing is the single most common thing this loop does.
+  const fallback: LoopRun = {
     id: run.id,
     route: routeOf(run),
-    // The run list does not carry the loop's own outcome line, so a finished run is described
-    // by its conclusion until the log reader exists. `unknown` is honest; inventing `acted`
-    // from `success` would not be, because a successful run that decided to do nothing is the
-    // single most common thing this loop does.
     outcome: "unknown",
     reason: run.conclusion ?? run.status,
     subject: subjectOf(run.display_title),
@@ -60,7 +65,12 @@ export async function listRuns(limit = 50): Promise<LoopRun[]> {
     ...(run.status === "completed" ? { finishedAt: run.updated_at } : {}),
     ...(run.conclusion === null ? {} : { conclusion: run.conclusion }),
     url: run.html_url,
-  }));
+  };
+  if (run.status !== "completed") return fallback;
+
+  const parsed = await outcomeFor(run.id);
+  if (parsed === undefined) return fallback;
+  return { ...fallback, outcome: parsed.outcome, reason: parsed.reason, subject: parsed.subject };
 }
 
 /** `#25` out of a run title, when the title names one. */
