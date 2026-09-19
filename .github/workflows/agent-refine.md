@@ -1,5 +1,5 @@
 ---
-# Managed by @plainconceptsplatform/workflows@0.5.1. Source: loops/workflows/agent-refine.md. Profile digest: ca96e80f128f. Update with `workflows update --force`; consumer edits may be overwritten.
+# Managed by @plainconceptsplatform/workflows@0.5.1. Source: loops/workflows/agent-refine.md. Profile digest: edd833fb9ae5. Update with `workflows update --force`; consumer edits may be overwritten.
 env:
   REPO_RULES: "Refine only the selected issue into a grounded, implementation-ready user story. Read repository documentation for domain context. Write acceptance criteria that match existing patterns. Do not implement code."
   PLAN_EXPLORE_SKILL: plan-explore
@@ -383,6 +383,11 @@ safe-outputs:
   report-failure-as-issue: false
   threat-detection: false
   update-issue:
+    # Refine is also reachable by dispatch, where there is no triggering issue, so the
+    # target cannot be `triggering`. The price is that every `update_issue` item must
+    # carry its own `issue_number`: gh-aw rejects an untargeted item under `*` before
+    # validate-refine-output ever sees it, and the run fails after the model has done
+    # all of its work. The prompt says so at every call site.
     target: "*"
   add-comment:
   # Split children. An oversized story becomes several implementable ones rather than
@@ -514,7 +519,8 @@ timeout-minutes: 40
    - the line `${{ env.SPLIT_PARENT_PREFIX }}N -->` naming the parent issue number
    - a `Blocked by #M` line naming any sibling that must land first, when order genuinely matters
 
-   Then call `update_issue` on the parent, replacing its body with a short summary of the whole
+   Then call `update_issue` on the parent, with `issue_number: ${{ inputs.issue-number }}`,
+   replacing its body with a short summary of the whole
    piece of work, the reason it was split, and a checklist linking every child. The parent keeps
    its own honest estimate. Do not write acceptance criteria on the parent: the children own them.
 
@@ -537,6 +543,11 @@ timeout-minutes: 40
 
     Labels are workflow-owned state. Do not call `add_labels` or `remove_labels`.
 
+    **Every `update_issue` call carries `issue_number: ${{ inputs.issue-number }}`.** That
+    is the issue you are refining, and it is the only issue you may update. An
+    `update_issue` with no issue number is rejected by the framework and the whole run
+    fails, after all of your work.
+
     **Do not probe safe-output tools.** Never call `update_issue` or `add_comment` with
     empty or test arguments — each safe-output type has a per-run limit of 1 call, and a
     probe call consumes that quota. Call a safe-output tool exactly once, with the full
@@ -553,7 +564,8 @@ timeout-minutes: 40
    them is a domain expert, not an engineer.
 
     **The story is complete.** You answered every exploration question yourself and none remain
-    for the author. Call `update_issue` with the replacement body and `add_comment`
+    for the author. Call `update_issue` with `issue_number: ${{ inputs.issue-number }}`
+    and the replacement body, and `add_comment`
     with `${{ env.REFINE_MARKER }}`, then `${{ env.SAFE_OUTPUT_COMMENT_PREFIX }}`,
     then exactly one of these messages, based only on the `labels` array in the supplied issue
     context:
@@ -562,8 +574,8 @@ timeout-minutes: 40
     - Otherwise: `Refinement complete. The implement label has been added and the implement workflow will start shortly.`
 
     **The story was split.** You estimated ${{ env.SPLIT_THRESHOLD }} or more and found real
-    seams. Call `create_issue` once per child, then `update_issue` on the parent with the
-    summary and the checklist, then `add_comment` with `${{ env.REFINE_MARKER }}`, then
+    seams. Call `create_issue` once per child, then `update_issue` on the parent
+    (`issue_number: ${{ inputs.issue-number }}`) with the summary and the checklist, then `add_comment` with `${{ env.REFINE_MARKER }}`, then
     `${{ env.SAFE_OUTPUT_COMMENT_PREFIX }}`, then one sentence naming the estimate you gave the
     whole and how many children you wrote. The children carry the work forward; the parent stays
     open as their tracker and is never implemented directly.

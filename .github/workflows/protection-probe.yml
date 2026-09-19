@@ -137,9 +137,7 @@ jobs:
           gh api --method POST "repos/${REPO}/git/refs" -f ref="refs/heads/${branch}" -f sha="$sha" --jq .ref
           # base64 of "auto\n", written out rather than piped: an escape in a heredoc
           # arrives changed often enough that this package has a rule about it.
-          # A new path per run: creating a file that already exists needs its blob sha, and
-          # the earlier probe left one behind when it merged.
-          gh api --method PUT "repos/${REPO}/contents/probe/${GITHUB_RUN_ID}.txt" -f message="probe: a change for the auto-merge chain" -f content="YXV0bwo=" -f branch="$branch" --jq .commit.sha
+          gh api --method PUT "repos/${REPO}/contents/PROBE-AUTO.txt" -f message="probe: a change for the auto-merge chain" -f content="YXV0bwo=" -f branch="$branch" --jq .commit.sha
           gh pr create --repo "$REPO" --base "$BASE" --head "$branch" --title "T219 probe: auto-merge waits for a human review" --body "Temporary. Arms auto-merge as the App under a ruleset requiring one review, then waits for a person."
 
       - name: Which rules does the forge say apply, as the App

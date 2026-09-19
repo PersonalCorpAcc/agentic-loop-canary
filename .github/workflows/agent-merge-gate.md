@@ -1,5 +1,5 @@
 ---
-# Managed by @plainconceptsplatform/workflows@0.5.1. Source: loops/workflows/agent-merge-gate.md. Profile digest: ca96e80f128f. Update with `workflows update --force`; consumer edits may be overwritten.
+# Managed by @plainconceptsplatform/workflows@0.5.1. Source: loops/workflows/agent-merge-gate.md. Profile digest: edd833fb9ae5. Update with `workflows update --force`; consumer edits may be overwritten.
 env:
   VERIFY_COMMANDS: "pnpm install --frozen-lockfile && pnpm run build && pnpm run test"
   REPO_RULES: "Make a risk-based merge decision for the selected bot pull request. Merge only when CI is green and no risk indicators are present. Review risk indicators defined in the repository's guardrails or project documentation. Any of these require human review. Do not merge protected file changes."
@@ -784,6 +784,23 @@ steps:
       gh pr diff "$PR" --repo "$REPO" > /tmp/gh-aw/agent/diff.patch
       gh pr view "$PR" --repo "$REPO" --json title,body,files,additions,deletions \
         > /tmp/gh-aw/agent/pr.json
+
+      # What this working tree is not. The agent is on the head branch; CI ran on the merge of
+      # head and base. Everything the base supplies -- a dependency, a tsconfig path, a
+      # generated file -- is absent here, so a build run in this tree can fail for reasons that
+      # do not exist in what will land. Recorded rather than inferred, because the agent cannot
+      # see it and has already argued itself past a green CI run without it (PR #55).
+      base=$(gh pr view "$PR" --repo "$REPO" --json baseRefName --jq '.baseRefName')
+      git fetch -q origin "$base" 2>/dev/null || true
+      behind=$(git rev-list --count "HEAD..origin/$base" 2>/dev/null || echo "unknown")
+      {
+        echo "base branch: $base"
+        echo "commits on the base that this branch does not have: $behind"
+        if [ "$behind" != "unknown" ] && [ "$behind" != "0" ]; then
+          echo "files those commits touch:"
+          git diff --name-only "HEAD...origin/$base" 2>/dev/null | head -50
+        fi
+      } > /tmp/gh-aw/agent/base-state.txt
       if [ "$CONCLUSION" = "failure" ] && [ -n "$RUN_ID" ]; then
         gh run view "$RUN_ID" --repo "$REPO" --log-failed \
           > /tmp/gh-aw/agent/failed-logs.txt 2>/dev/null || \
@@ -830,6 +847,15 @@ timeout-minutes: 60
    It has already been confirmed that this is an open pull request we authored, that it closes
    an issue, and that the issue carries `implement`. Do not re-check any of that, and do not
    poll for checks: the conclusion above is the answer.
+
+   **You are on the head branch, not on the merge of the head and its base.** CI ran on the
+   merge of the two, which is also what will land. Read `/tmp/gh-aw/agent/base-state.txt`: it
+   names the base and how many commits this branch is missing from it. If you run a build or a
+   type check here and it fails while the conclusion above is `success`, the tree you are
+   standing in is missing what the base supplies -- a dependency, a path alias, a generated
+   file -- and **CI is right and you are not**. Say what you observed if it is useful, and do
+   not turn it into a verdict. A local failure is evidence of a merge result only when the
+   branch is missing nothing from its base.
 
    You are on the pull request branch. Never rebase, reset, amend or otherwise rewrite
    history: the workflow applies your commits as a bundle with a fast-forward-only push and
