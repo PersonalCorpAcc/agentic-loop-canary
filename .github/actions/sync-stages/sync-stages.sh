@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Managed by @plainconceptsplatform/workflows@0.5.1. Source: loops/actions/sync-stages/sync-stages.sh. Profile digest: ca96e80f128f. Update with `workflows update --force`; consumer edits may be overwritten.
+# Managed by @plainconceptsplatform/workflows@0.5.1. Source: loops/actions/sync-stages/sync-stages.sh. Profile digest: edd833fb9ae5. Update with `workflows update --force`; consumer edits may be overwritten.
 #
 # Carry a change that arrived on a later stage back down the chain (FR-079).
 #
