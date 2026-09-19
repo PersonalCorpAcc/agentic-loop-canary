@@ -1,5 +1,5 @@
 ---
-# Managed by @plainconceptsplatform/workflows@0.5.1. Source: loops/workflows/agent-release.md. Profile digest: ca96e80f128f. Update with `workflows update --force`; consumer edits may be overwritten.
+# Managed by @plainconceptsplatform/workflows@0.5.1. Source: loops/workflows/agent-release.md. Profile digest: edd833fb9ae5. Update with `workflows update --force`; consumer edits may be overwritten.
 env:
   GIT_AUTHOR_NAME: "github-actions[bot]"
   GIT_AUTHOR_EMAIL: "github-actions[bot]@users.noreply.github.com"
@@ -66,8 +66,8 @@ steps:
 
       case "$VERSION_SOURCE" in
         package-manifest) version=$(jq -r '.version // "0.0.0"' package.json 2>/dev/null || echo "0.0.0") ;;
-        git-tag) version=$(git describe --tags --abbrev=0 2>/dev/null | sed 's/^v//'); version=${version:-0.0.0} ;;
-        python-project) version=$(sed -n 's/^version *= *"\(.*\)".*/\1/p' pyproject.toml 2>/dev/null | head -1); version=${version:-0.0.0} ;;
+        git-tag) version=$(git describe --tags --abbrev=0 2>/dev/null || echo ""); version=${version#v}; version=${version:-0.0.0} ;;
+        python-project) version=$(sed -n 's/^version *= *"\(.*\)".*/\1/p' pyproject.toml 2>/dev/null | head -1 || echo ""); version=${version:-0.0.0} ;;
         none) version="0.0.0" ;;
         *) echo "::error::Unknown version source: $VERSION_SOURCE"; exit 1 ;;
       esac
@@ -123,8 +123,8 @@ jobs:
 
           case "$VERSION_SOURCE" in
             package-manifest) version=$(jq -r '.version // "0.0.0"' package.json 2>/dev/null || echo "0.0.0") ;;
-            git-tag) version=$(git describe --tags --abbrev=0 2>/dev/null | sed 's/^v//'); version=${version:-0.0.0} ;;
-            python-project) version=$(sed -n 's/^version *= *"\(.*\)".*/\1/p' pyproject.toml 2>/dev/null | head -1); version=${version:-0.0.0} ;;
+            git-tag) version=$(git describe --tags --abbrev=0 2>/dev/null || echo ""); version=${version#v}; version=${version:-0.0.0} ;;
+            python-project) version=$(sed -n 's/^version *= *"\(.*\)".*/\1/p' pyproject.toml 2>/dev/null | head -1 || echo ""); version=${version:-0.0.0} ;;
             none) version="0.0.0" ;;
             *) echo "::error::Unknown version source: $VERSION_SOURCE"; exit 1 ;;
           esac
