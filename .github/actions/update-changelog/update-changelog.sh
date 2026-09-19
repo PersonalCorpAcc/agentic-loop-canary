@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Managed by @plainconceptsplatform/workflows@0.5.1. Source: loops/actions/update-changelog/update-changelog.sh. Profile digest: ca96e80f128f. Update with `workflows update --force`; consumer edits may be overwritten.
+# Managed by @plainconceptsplatform/workflows@0.5.1. Source: loops/actions/update-changelog/update-changelog.sh. Profile digest: edd833fb9ae5. Update with `workflows update --force`; consumer edits may be overwritten.
 #
 # Prepend a changelog entry for a landed change and commit it onto the branch the caller is
 # already on. No push: the caller pushes it with the rest of the promotion, so one branch,
