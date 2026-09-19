@@ -75,7 +75,7 @@ branching:
   #
   # A concurrency group cannot express "at most N", so this selects the shape rather than a
   # limit: above 1 the ceiling is the runner fleet, not this number.
-  concurrentImplements: 2
+  concurrentImplements: 4
   mergeMethod: rebase
   closeIssueOn: main
   branchNaming: agent/{issue}-{run}
