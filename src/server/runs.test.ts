@@ -1,6 +1,17 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { routeOf, subjectOf } from "./runs.js";
+import { listRuns, routeOf, RunsFetchError, subjectOf } from "./runs.js";
+
+function fakeResponse(init: { ok: boolean; status?: number; remaining?: string; body?: unknown }): Response {
+  const headers = new Headers();
+  if (init.remaining !== undefined) headers.set("x-ratelimit-remaining", init.remaining);
+  return {
+    ok: init.ok,
+    status: init.status ?? (init.ok ? 200 : 500),
+    headers,
+    json: () => Promise.resolve(init.body ?? { workflow_runs: [] }),
+  } as Response;
+}
 
 /**
  * Real run titles, taken from this repository's own Actions history. The router names every
@@ -26,5 +37,33 @@ describe("reading a route out of a run title", () => {
     expect(subjectOf("Working (Merge Gate): PR #25")).toBe("#25");
     expect(subjectOf("Working (Implement): Add IsPrerelease (#24)")).toBe("#24");
     expect(subjectOf("dispatch: promote")).toBe("-");
+  });
+});
+
+describe("reading the forge's rate-limit signal", () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it("carries x-ratelimit-remaining back on a success", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(fakeResponse({ ok: true, remaining: "42" })));
+    const result = await listRuns();
+    expect(result.rateLimitRemaining).toBe(42);
+    expect(result.runs).toEqual([]);
+  });
+
+  it("flags a 403 as rate limited", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(fakeResponse({ ok: false, status: 403 })));
+    await expect(listRuns()).rejects.toMatchObject({ rateLimited: true } satisfies Partial<RunsFetchError>);
+  });
+
+  it("flags a 429 as rate limited", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(fakeResponse({ ok: false, status: 429 })));
+    await expect(listRuns()).rejects.toMatchObject({ rateLimited: true } satisfies Partial<RunsFetchError>);
+  });
+
+  it("does not call an unrelated failure rate limited", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(fakeResponse({ ok: false, status: 500 })));
+    await expect(listRuns()).rejects.toMatchObject({ rateLimited: false } satisfies Partial<RunsFetchError>);
   });
 });
