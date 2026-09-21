@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Managed by @plainconceptsplatform/workflows@0.5.1. Source: loops/actions/resolve-pr-issue/resolve-pr-issue.sh. Profile digest: edd833fb9ae5. Update with `workflows update --force`; consumer edits may be overwritten.
+# Managed by @plainconceptsplatform/workflows@0.5.1. Source: loops/actions/resolve-pr-issue/resolve-pr-issue.sh. Profile digest: cd84a4273d7e. Update with `workflows update --force`; consumer edits may be overwritten.
 #
 # Which issue does this pull request belong to? (FR-030)
 #

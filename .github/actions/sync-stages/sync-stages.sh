@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Managed by @plainconceptsplatform/workflows@0.5.1. Source: loops/actions/sync-stages/sync-stages.sh. Profile digest: edd833fb9ae5. Update with `workflows update --force`; consumer edits may be overwritten.
+# Managed by @plainconceptsplatform/workflows@0.5.1. Source: loops/actions/sync-stages/sync-stages.sh. Profile digest: cd84a4273d7e. Update with `workflows update --force`; consumer edits may be overwritten.
 #
 # Carry a change that arrived on a later stage back down the chain (FR-079).
 #
@@ -224,7 +224,7 @@ for (( index=${#stages[@]} - 1; index > 0; index-- )); do
 
 A change reached \`${later}\` without coming up the chain -- a hotfix, an administrative push, or a revert -- so \`${earlier}\` does not have it. Until it does, every pull request into \`${earlier}\` carries this delta as well as its own change, which trips the protected-files rule and hands work to a person that nobody needed to look at.
 
-Commits missing by content: ${#to_pick[@]}. This is a **merge**, not a replay: the content is only half of it, and the other half is that \`${earlier}\` should contain \`${later}\`'s commits, so that a pull request into \`${earlier}\` diffs against the right point. **Please merge this with a merge commit.** Squashing it would carry the content and leave the histories apart, which is the state this pull request exists to end; GitHub will not offer rebase, because the head is a merge.
+Commits missing by content: ${#to_pick[@]}. This is a **merge**, not a replay: the content is only half of it, and the other half is that \`${earlier}\` should contain \`${later}\`'s commits, so that a pull request into \`${earlier}\` diffs against the right point. **Auto-merge is armed on this, with a merge commit**, so it lands on its own once its checks pass; if arming was refused -- usually because **Allow auto-merge** is off for this repository -- merge it by hand, **with a merge commit**. Squashing it would carry the content and leave the histories apart, which is the state this pull request exists to end; GitHub will not offer rebase, because the head is a merge.
 
 Nothing on \`${later}\` was touched, and nothing on \`${earlier}\` is removed by this.
 
@@ -234,6 +234,21 @@ Nothing on \`${later}\` was touched, and nothing on \`${earlier}\` is removed by
     grep -oE '[0-9]+$' || true)"
 
   note "Opened pull request #${new_pr:-?} carrying ${later} into ${earlier}."
+
+  # Nobody waits for this. It repairs drift the loop itself caused by promoting, it adds no
+  # work of its own, and its checks judge it like any other pull request -- so it is armed
+  # rather than announced. A merge commit whatever `branching.mergeMethod` says: the head is
+  # a merge, the forge will not offer rebase for it, and a squash would carry the content and
+  # leave the histories apart, which is the state this pull request exists to end (FR-086).
+  if [ -n "${new_pr:-}" ]; then
+    if armed="$(gh pr merge "$new_pr" --repo "$REPO" --merge --auto 2>&1)"; then
+      note "Auto-merge armed on #${new_pr}: it lands as a merge commit when its checks pass."
+    else
+      # Named rather than swallowed: the usual cause is a repository setting, and a pull
+      # request nobody is waiting for is exactly the kind that sits for a week.
+      note "::warning::Auto-merge could not be armed on #${new_pr} (${armed}); it waits for a person. If that says Allow auto-merge is off, it is a repository setting rather than a fault here."
+    fi
+  fi
   opened=$((opened + 1))
   reason="acted"
   git switch --detach "refs/remotes/origin/${earlier}" >/dev/null 2>&1 || true

@@ -1,5 +1,5 @@
 ---
-# Managed by @plainconceptsplatform/workflows@0.5.1. Source: loops/workflows/agent-apply-review.md. Profile digest: edd833fb9ae5. Update with `workflows update --force`; consumer edits may be overwritten.
+# Managed by @plainconceptsplatform/workflows@0.5.1. Source: loops/workflows/agent-apply-review.md. Profile digest: cd84a4273d7e. Update with `workflows update --force`; consumer edits may be overwritten.
 env:
   # Printed by the prompt as the verification block. Consumers set their own commands.
   VERIFY_COMMANDS: "pnpm install --frozen-lockfile && pnpm run build && pnpm run test"
@@ -58,6 +58,7 @@ jobs:
       pr: ${{ steps.subject.outputs.pr }}
       issue: ${{ steps.subject.outputs.issue }}
       unresolved: ${{ steps.subject.outputs.unresolved }}
+      threads: ${{ steps.subject.outputs.threads }}
     steps:
       - name: Confirm this is our pull request and the feedback is substantive
         id: subject
@@ -94,23 +95,35 @@ jobs:
           fi
 
           # Unresolved review threads, from the API rather than from the model's reading of it.
-          unresolved=$(gh api graphql -f query='
+          # The threads themselves are carried, not just how many: the agent's push outdates
+          # every thread it fixes, so this is the only moment the set can be read (T245).
+          threads=$(gh api graphql -f query='
             query($owner:String!, $name:String!, $number:Int!) {
               repository(owner:$owner, name:$name) {
                 pullRequest(number:$number) {
-                  reviewThreads(first:100) { nodes { isResolved isOutdated } }
+                  reviewThreads(first:100) { nodes { id isResolved isOutdated } }
                 }
               }
             }' \
             -f owner="${REPO%/*}" -f name="${REPO#*/}" -F number="$PR" \
-            --jq '[.data.repository.pullRequest.reviewThreads.nodes[]
-                   | select(.isResolved == false and .isOutdated == false)] | length')
+            --jq -c '[.data.repository.pullRequest.reviewThreads.nodes[]
+                      | select(.isResolved == false and .isOutdated == false)]')
+          unresolved=$(printf '%s' "$threads" | jq 'length')
+
+          # Measured and then acted on. Two events arrive for one review -- the submission and
+          # each of its comments -- and the `pr-feedback-<pr>` group serialises them, so the
+          # second starts after the first has pushed its fix and outdated the thread it fixed.
+          # Without this it ran a second agent over a pull request with nothing outstanding,
+          # and the outcome line below has always said that is not what happens (T245).
+          [ "$unresolved" -gt 0 ] || \
+            none "PR #$PR has no unresolved review threads; the feedback has already been applied."
 
           {
             echo "found=true"
             echo "pr=$PR"
             echo "issue=${issue:-}"
             echo "unresolved=$unresolved"
+            echo "threads=$threads"
            } >> "$GITHUB_OUTPUT"
            echo "PR #$PR has $unresolved unresolved thread(s)"
       - name: Check out the outcome action
@@ -177,22 +190,17 @@ jobs:
         uses: ./.github/actions/download-agent-output
         with:
           artifact-name: ${{ needs.activation.outputs.artifact_prefix }}agent
-      - name: Load unresolved review threads
+      - name: Write the threads the run began with
+        # Read before the agent ran, by the subject job. Asking the forge again here returns
+        # the threads as the agent's own push left them -- outdated, therefore excluded,
+        # therefore an empty expected set that nothing the agent reported can match. The
+        # route failed this way on its first real run (T245).
         env:
-          GH_TOKEN: ${{ github.token }}
-          REPO: ${{ github.repository }}
-          PR: ${{ needs.subject.outputs.pr }}
+          THREADS: ${{ needs.subject.outputs.threads }}
         run: |
           set -euo pipefail
-          gh api graphql -f query='
-            query($owner:String!, $name:String!, $number:Int!) {
-              repository(owner:$owner, name:$name) {
-                pullRequest(number:$number) {
-                  reviewThreads(first:100) { nodes { id isResolved isOutdated } }
-                }
-              }
-            }' -f owner="${REPO%/*}" -f name="${REPO#*/}" -F number="$PR" \
-            --jq '.data.repository.pullRequest.reviewThreads.nodes' > /tmp/review-threads.json
+          printf '%s' "${THREADS:-[]}" > /tmp/review-threads.json
+          jq -e 'type == "array"' /tmp/review-threads.json >/dev/null
       - id: validate
         uses: ./.github/actions/validate-review-output
         with:

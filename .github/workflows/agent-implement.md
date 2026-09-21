@@ -1,5 +1,5 @@
 ---
-# Managed by @plainconceptsplatform/workflows@0.5.1. Source: loops/workflows/agent-implement.md. Profile digest: edd833fb9ae5. Update with `workflows update --force`; consumer edits may be overwritten.
+# Managed by @plainconceptsplatform/workflows@0.5.1. Source: loops/workflows/agent-implement.md. Profile digest: cd84a4273d7e. Update with `workflows update --force`; consumer edits may be overwritten.
 env:
   VERIFY_COMMANDS: "pnpm install --frozen-lockfile && pnpm run build && pnpm run test"
   REPO_RULES: "Implement only the selected issue. Follow the repository's own documentation and conventions, and do not weaken tests or bypass checks."
@@ -389,24 +389,39 @@ jobs:
         run: |
           set -euo pipefail
           # The agent job belongs to this same run: a called workflow shares the caller's run id.
-          read -r started finished <<<"$(gh api "repos/$REPO/actions/runs/$RUN_ID/jobs?per_page=100" \
+          read -r job_id started finished <<<"$(gh api "repos/$REPO/actions/runs/$RUN_ID/jobs?per_page=100" \
             --jq '[.jobs[] | select(.name | endswith("agent"))] | last // empty
-                  | "\(.started_at // "") \(.completed_at // "")"')"
+                  | "\(.id // "") \(.started_at // "") \(.completed_at // "")"')"
           minutes=-1
           if [ -n "${started:-}" ] && [ -n "${finished:-}" ]; then
             minutes=$(( ( $(date -u -d "$finished" +%s) - $(date -u -d "$started" +%s) ) / 60 ))
           fi
+
+          # A failure the account caused is not an outage, and retrying it cannot work. The
+          # duration test below cannot tell them apart -- a refused request fails in about a
+          # minute, which is exactly what a short outage looks like -- so this asks the log
+          # what the provider actually said. The framework's own `http_400_response_error`
+          # and `inference_access_error` outputs were both false for a 400 carrying
+          # `billing_error`, so they are not the signal (T251).
+          billing=false
+          if [ -n "${job_id:-}" ] &&
+             gh api "repos/$REPO/actions/jobs/${job_id}/logs" 2>/dev/null |
+               grep -qiE 'billing_error|credit balance is too low'; then
+            billing=true
+          fi
+
           retry=false
           # An unknown duration is treated as a long run: never retry on a guess.
-          if [ "$minutes" -ge 0 ] && [ "$minutes" -lt "$UNDER_MINUTES" ] && [ "$ATTEMPTS" -lt "$PARK_AT" ]; then
+          if [ "$billing" = false ] && [ "$minutes" -ge 0 ] && [ "$minutes" -lt "$UNDER_MINUTES" ] && [ "$ATTEMPTS" -lt "$PARK_AT" ]; then
             retry=true
           fi
           {
             echo "retry=$retry"
+            echo "billing=$billing"
             echo "next=$((ATTEMPTS + 1))"
             echo "minutes=$minutes"
           } >> "$GITHUB_OUTPUT"
-          echo "agent job ran for ${minutes}m; attempts so far ${ATTEMPTS}; retry=${retry}"
+          echo "agent job ran for ${minutes}m; attempts so far ${ATTEMPTS}; billing=${billing}; retry=${retry}"
       # The attempt is recorded before any label moves, so a failure in the steps below leaves a
       # run that can be counted rather than an issue released with nothing to show for it.
       - name: Report the failed attempt
@@ -420,6 +435,27 @@ jobs:
             Attempt ${{ steps.decide.outputs.next }} of ${{ env.MAX_ATTEMPTS }} ended after ${{ steps.decide.outputs.minutes }} minutes, before the run could produce an answer. That is what a provider outage looks like, so this is being retried.
             The issue keeps `implement`.
             [View this workflow run](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }})
+      # The one failure that must not be retried, and the only one whose fix is a person
+      # topping up an account. Said plainly, and the reservation comes off so the issue is
+      # not held by a run nobody is going to make (T251).
+      - name: Say that the model credential has no credit
+        if: steps.decide.outputs.billing == 'true'
+        uses: ./.github/actions/create-issue-comment
+        with:
+          token: ${{ steps.app-token.outputs.token }}
+          issue-number: ${{ inputs.issue-number }}
+          body: |
+            ${{ env.ATTEMPT_MARKER }}
+            The model provider refused this run: the account behind this repository's model credential has no credit. Nothing is wrong with the issue or the branch, and retrying will not help until somebody tops the account up.
+            The issue keeps `implement` and will be picked up on the next attempt once the account works.
+            [View this workflow run](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }})
+      - name: Release the reservation after a billing failure
+        if: steps.decide.outputs.billing == 'true'
+        uses: ./.github/actions/remove-issue-labels
+        with:
+          token: ${{ steps.app-token.outputs.token }}
+          issue-number: ${{ inputs.issue-number }}
+          labels: ${{ env.WORKING_LABEL }}
       - name: Release the reservation for the retry
         if: steps.decide.outputs.retry == 'true'
         uses: ./.github/actions/remove-issue-labels
