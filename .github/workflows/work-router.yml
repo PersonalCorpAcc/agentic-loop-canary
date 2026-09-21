@@ -1,4 +1,4 @@
-# Managed by @plainconceptsplatform/workflows@0.5.1. Source: loops/workflows/work-router.yml. Profile digest: edd833fb9ae5. Update with `workflows update --force`; consumer edits may be overwritten.
+# Managed by @plainconceptsplatform/workflows@0.5.1. Source: loops/workflows/work-router.yml. Profile digest: cd84a4273d7e. Update with `workflows update --force`; consumer edits may be overwritten.
 name: "All Work Router"
 
 # Owns every repository automation trigger. Classifies each event into exactly one route,
@@ -867,6 +867,15 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
+      # A dispatch raised with GITHUB_TOKEN starts no run, which is the framework's own
+      # recursion guard, so the carry-down below needs the App's token like every other
+      # dispatch this router makes.
+      - name: Generate App token for the carry-down
+        id: carry-token
+        uses: actions/create-github-app-token@df432ceedc7162793a195dd1713ff69aefc7379e # v2.0.6
+        with:
+          app-id: ${{ secrets.BOT_APP_ID }}
+          private-key: ${{ secrets.BOT_PRIVATE_KEY }}
       - name: Find the change this pull request carries
         id: change
         env:
@@ -944,6 +953,49 @@ jobs:
           token: ${{ github.token }}
           issue-number: ${{ steps.change.outputs.issue }}
           labels: ${{ env.HOLD_LABEL }}
+      # The merge that just happened is the thing that breaks ancestry: promotion replays a
+      # change onto the stage above, so the moment it lands there, that stage holds commits
+      # the stage below does not, and a branch cut from it can no longer be rebase-merged
+      # downwards -- the forge refuses with "This branch can't be rebased" and names nothing.
+      # Carried down here, in the run that caused it, rather than left to the six-hourly
+      # clock: waiting on a cron for a state the loop itself just broke is not a mechanism,
+      # it is a belt. The clock stays for drift the loop did not cause, which is a person
+      # pushing to a later stage -- the case FR-079 was written for (FR-086).
+      #
+      # Nothing is carried down from the first stage: it has nothing below it.
+      - name: Carry the stage that moved back down the chain
+        # Only a merge moves a stage: a pull request closed unmerged changed nothing.
+        if: needs.classify.outputs.pr-merged == 'true' && needs.classify.outputs.pr-base != ''
+        env:
+          GH_TOKEN: ${{ steps.carry-token.outputs.token }}
+          REPO: ${{ github.repository }}
+          MOVED: ${{ needs.classify.outputs.pr-base }}
+          STAGES: "dev,test,main"
+          # A dispatch runs the workflow file at the ref it names, and every event-triggered
+          # run executes the default-branch copy, so this names the same one (FR-025).
+          DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
+        run: |
+          set -euo pipefail
+          case ",${STAGES}," in
+            *",${MOVED},"*) ;;
+            *)
+              echo "::notice::${MOVED} is not one of this repository's stages (${STAGES}); nothing to carry down."
+              exit 0
+              ;;
+          esac
+
+          # The first stage has nothing below it, and under trunk there is only one branch,
+          # so both answer here rather than dispatching a route that would find nothing.
+          first="${STAGES%%,*}"
+          if [ "$MOVED" = "$first" ]; then
+            echo "${MOVED} is the first stage, so no stage is below it; nothing to carry down."
+            exit 0
+          fi
+          echo "${MOVED} moved, so the stages below it may no longer descend from it; carrying down."
+          gh api "repos/$REPO/actions/workflows/work-router.yml/dispatches" \
+            --method POST \
+            -f ref="$DEFAULT_BRANCH" \
+            -f "inputs[operation]=sync-stages"
       - name: Say why the change is held
         if: steps.change.outputs.issue != '' && needs.classify.outputs.pr-merged != 'true' && steps.change.outputs.promotion == 'true'
         uses: ./.github/actions/create-issue-comment

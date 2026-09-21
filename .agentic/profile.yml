@@ -76,7 +76,7 @@ branching:
   # A concurrency group cannot express "at most N", so this selects the shape rather than a
   # limit: above 1 the ceiling is the runner fleet, not this number.
   concurrentImplements: 4
-  mergeMethod: rebase
+  mergeMethod: squash
   closeIssueOn: main
   branchNaming: agent/{issue}-{run}
   # Short, because a canary that soaked for a day would prove one promotion a day.
