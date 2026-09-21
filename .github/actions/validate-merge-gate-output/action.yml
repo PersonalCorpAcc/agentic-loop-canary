@@ -1,4 +1,4 @@
-# Managed by @plainconceptsplatform/workflows@0.5.1. Source: loops/actions/validate-merge-gate-output/action.yml. Profile digest: a586f6e065d0. Update with workflows update --force; consumer edits may be overwritten.
+# Managed by @plainconceptsplatform/workflows@0.5.1. Source: loops/actions/validate-merge-gate-output/action.yml. Profile digest: 17b8a563c65f. Update with workflows update --force; consumer edits may be overwritten.
 name: Validate merge-gate output
 description: Verify agent_output.json contains a usable merge-gate verdict before any state changes.
 inputs:
@@ -6,7 +6,11 @@ inputs:
     description: Path to agent_output.json.
     required: true
   issue-number:
-    description: Issue number that the merge-gate outcome must target.
+    description: >
+      The number the merge-gate comment must target. An issue for an ordinary pull request,
+      and the pull request itself for a promotion, which has no single issue its assessment
+      could belong to (FR-056). The check is that the agent commented where it was told to;
+      which kind of thing that is, is the caller's to know.
     required: true
   ci-conclusion:
     description: CI conclusion supplied to the merge gate.
