@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Managed by @plainconceptsplatform/workflows@0.5.1. Source: loops/actions/promote-change/promote-change.sh. Profile digest: cd84a4273d7e. Update with `workflows update --force`; consumer edits may be overwritten.
+# Managed by @plainconceptsplatform/workflows@0.5.1. Source: loops/actions/promote-change/promote-change.sh. Profile digest: a586f6e065d0. Update with `workflows update --force`; consumer edits may be overwritten.
 #
 # Move the changes that are ready one stage along the chain (FR-031).
 #
@@ -99,7 +99,7 @@ patch_ids_of() {
 # so the branch is this route's own scratch space rather than a record of anything.
 identify_commits() {
   local pr="$1"
-  local merge_commit
+  local merge_commit squashed
 
   case "${MERGE_METHOD:-rebase}" in
     rebase)
@@ -114,7 +114,16 @@ identify_commits() {
       # One commit, written by the forge, containing the whole change. Reconstructing the
       # pull request's own commits here would put work on the next stage that never existed
       # on this one.
-      gh api "repos/${REPO}/pulls/${pr}" --jq '.merge_commit_sha // empty'
+      #
+      # Fetched before it is named, like the other two arms: a checkout brings down what the
+      # run needs and nothing else, so handing an unfetched sha to `git show` exits 128 and
+      # takes the whole route with it. Found the first time a repository promoted under
+      # squash rather than rebase, which is also why the unit test did not catch it -- its
+      # harness builds a full local repository (FR-032).
+      squashed="$(gh api "repos/${REPO}/pulls/${pr}" --jq '.merge_commit_sha // empty')"
+      [ -n "$squashed" ] || return 0
+      git fetch --no-tags --quiet origin "$squashed" 2>/dev/null || true
+      printf '%s\n' "$squashed"
       ;;
     merge)
       # A merge commit has two parents: the stage, and the change. Everything reachable from
