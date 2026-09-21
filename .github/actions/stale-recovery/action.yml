@@ -120,6 +120,8 @@ runs:
                       updatedAt
                       body
                       author { __typename }
+                      headRefName
+                      headRefOid
                       closingIssuesReferences(first: 10) {
                         nodes { number labels(first: 20) { nodes { name } } }
                       }
@@ -256,13 +258,18 @@ runs:
 
           if (ciWorkflow) {
             for (const pr of botPullRequests) {
+              if (!pr.headRefName) continue;
+
               const runs = await github.rest.actions.listWorkflowRuns({
                 ...context.repo,
                 workflow_id: CI_WORKFLOW_NAME,
-                branch: pr.number.toString(),
+                branch: pr.headRefName,
                 status: 'completed',
                 per_page: 1,
-              }).catch(() => ({ data: { workflow_runs: [] } }));
+              }).catch((error) => {
+                core.warning(`PR #${pr.number}: listWorkflowRuns failed, treating as no runs yet: ${error.message}`);
+                return { data: { workflow_runs: [] } };
+              });
 
               const latestRun = runs.data.workflow_runs[0];
               if (!latestRun || latestRun.conclusion !== 'failure') continue;
