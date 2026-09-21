@@ -34,6 +34,10 @@ env:
   # whose own build failed to compile had spent 182 turns, and an out-of-memory kill came after
   # a full verification suite.
   RETRY_UNDER_MINUTES: "6"
+  # How this repository's engine says it will not bill the request. An extended regular
+  # expression, from the engine table, because the wording and the code belong to the
+  # provider and this package runs five of them (FR-087).
+  REFUSAL_SIGNATURE: "billing_error|credit balance is too low"
   INCOMPLETE_COMMENT: "Automated implementation ran and ended without an outcome. The issue is released and flagged for review: a run that got this far and still failed will fail the same way again."
   ISSUE_CONTEXT_PATH: /tmp/gh-aw/agent/implementation-context.json
   # The branch a pull request opens against, which under a chain is not the branch the
@@ -386,6 +390,7 @@ jobs:
           ATTEMPTS: ${{ inputs.attempts_so_far || '0' }}
           PARK_AT: ${{ env.PARK_AT_ATTEMPT }}
           UNDER_MINUTES: ${{ env.RETRY_UNDER_MINUTES }}
+          REFUSAL_SIGNATURE: ${{ env.REFUSAL_SIGNATURE }}
         run: |
           set -euo pipefail
           # The agent job belongs to this same run: a called workflow shares the caller's run id.
@@ -400,13 +405,13 @@ jobs:
           # A failure the account caused is not an outage, and retrying it cannot work. The
           # duration test below cannot tell them apart -- a refused request fails in about a
           # minute, which is exactly what a short outage looks like -- so this asks the log
-          # what the provider actually said. The framework's own `http_400_response_error`
-          # and `inference_access_error` outputs were both false for a 400 carrying
-          # `billing_error`, so they are not the signal (T251).
+          # what the provider actually said, in that provider's own words (FR-087). The
+          # framework's own `http_400_response_error` and `inference_access_error` outputs
+          # were both false for a 400 carrying `billing_error`, so they are not the signal.
           billing=false
-          if [ -n "${job_id:-}" ] &&
+          if [ -n "${job_id:-}" ] && [ -n "${REFUSAL_SIGNATURE:-}" ] &&
              gh api "repos/$REPO/actions/jobs/${job_id}/logs" 2>/dev/null |
-               grep -qiE 'billing_error|credit balance is too low'; then
+               grep -qiE "${REFUSAL_SIGNATURE}"; then
             billing=true
           fi
 

@@ -23,6 +23,17 @@ inputs:
   release-pattern:
     description: Extended regular expression matching release branches, so the guard refuses them as synchronisation heads.
     required: false
+  auto-merge-mode:
+    description: >
+      The profile's `branching.autoMerge.mode`. A carry-down repairs drift the loop caused
+      and merges itself where the adopter permits unattended merging into that stage; `off`
+      means it waits for a person like anything else (FR-086).
+    required: false
+    default: "off"
+  auto-merge-targets:
+    description: Comma-separated stages the profile permits the loop to merge into unattended.
+    required: false
+    default: ""
   history-limit:
     description: How far back each stage is read. A bound rather than a policy; content older than this is caught by the empty cherry-pick instead.
     required: false
@@ -58,6 +69,8 @@ runs:
         STAGE_BRANCHES: ${{ inputs.stages }}
         BRANCH_STRATEGY: ${{ inputs.branch-strategy }}
         RELEASE_PATTERN: ${{ inputs.release-pattern }}
+        AUTO_MERGE_MODE: ${{ inputs.auto-merge-mode }}
+        AUTO_MERGE_TARGETS: ${{ inputs.auto-merge-targets }}
         HISTORY_LIMIT: ${{ inputs.history-limit }}
         TITLE_PREFIX: ${{ inputs.title-prefix }}
         DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
