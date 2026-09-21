@@ -1,5 +1,5 @@
 ---
-# Managed by @plainconceptsplatform/workflows@0.5.1. Source: loops/workflows/agent-implement.md. Profile digest: cd84a4273d7e. Update with `workflows update --force`; consumer edits may be overwritten.
+# Managed by @plainconceptsplatform/workflows@0.5.1. Source: loops/workflows/agent-implement.md. Profile digest: a586f6e065d0. Update with `workflows update --force`; consumer edits may be overwritten.
 env:
   VERIFY_COMMANDS: "pnpm install --frozen-lockfile && pnpm run build && pnpm run test"
   REPO_RULES: "Implement only the selected issue. Follow the repository's own documentation and conventions, and do not weaken tests or bypass checks."
@@ -80,7 +80,7 @@ on:
         default: '0'
 jobs:
   eligibility:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     permissions:
       issues: read
       pull-requests: read
@@ -172,7 +172,7 @@ jobs:
   reserve:
     needs: [eligibility]
     if: needs.eligibility.outputs.eligible == 'true' && needs.eligibility.outputs.duplicate != 'true'
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     permissions:
       contents: read
       issues: write
@@ -242,7 +242,7 @@ jobs:
       always() &&
       needs.agent.result == 'success' &&
       needs.safe_outputs.result == 'success'
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     permissions:
       contents: read
       issues: write
@@ -364,7 +364,7 @@ jobs:
         needs.agent.result != 'success' ||
         needs.safe_outputs.result != 'success'
       )
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     permissions:
       contents: read
       issues: write
@@ -520,8 +520,8 @@ jobs:
 
 if: inputs.issue-number != ''
 
-runs-on: ubuntu-latest
-runs-on-slim: ubuntu-latest
+runs-on: ubuntu-24.04
+runs-on-slim: ubuntu-24.04
 
 engine:
   id: claude
