@@ -13,6 +13,7 @@ import { needsAttention } from "../shared/types.js";
 export function App(): ReactElement {
   const [runs, setRuns] = useState<readonly LoopRun[]>([]);
   const [live, setLive] = useState(false);
+  const [strategy, setStrategy] = useState<string | null>(null);
 
   useEffect(() => {
     const socket = new WebSocket(socketUrl(location));
@@ -27,6 +28,13 @@ export function App(): ReactElement {
     return () => socket.close();
   }, []);
 
+  useEffect(() => {
+    fetch("/api/strategy")
+      .then((response) => response.json() as Promise<{ strategy: string | null }>)
+      .then((body) => setStrategy(body.strategy))
+      .catch(() => setStrategy(null));
+  }, []);
+
   const ordered = useMemo(() => [...runs].sort(compareRuns), [runs]);
   const waiting = ordered.filter(needsAttention).length;
 
@@ -37,6 +45,7 @@ export function App(): ReactElement {
         <p>
           {live ? "live" : "reconnecting"} · {runs.length} run(s)
           {waiting > 0 ? ` · ${waiting} waiting for a person` : ""}
+          {strategy ? ` · ${strategy}` : ""}
         </p>
       </header>
       <ol>
