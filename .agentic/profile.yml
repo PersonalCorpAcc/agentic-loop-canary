@@ -3,6 +3,15 @@
 # A branch chain on purpose: `trunk` is the shape this loop has run in production for
 # months, and the chain is the one nothing has ever executed. Work is cut from `main`,
 # opens against `dev`, and is promoted dev → test → main, closing its issue at `main`.
+#
+# `env-promotion` since 21/09/2026, which is the same chain promoted a different way. Under
+# `branch-chain` a promotion rebuilds one change's branch on the next stage and cherry-picks
+# it; under `env-promotion` the head is a snapshot of the stage below, so a promotion carries
+# everything that has landed there since the last one -- several changes, several issues, one
+# pull request. That is the shape a per-environment repository actually has, and it is the
+# one nothing had executed. It is also the harder one to get right: eligibility becomes a
+# question about the stage rather than about a change, because a snapshot cannot leave one
+# commit behind.
 version: 1
 name: loopscope
 
@@ -68,7 +77,7 @@ projects:
     lint: pnpm run typecheck
 
 branching:
-  strategy: branch-chain
+  strategy: env-promotion
   cutFrom: main
   chain: [dev, test, main]
   # Two issues may be implemented at once. The shipped default is 1, which is what the
@@ -79,6 +88,11 @@ branching:
   # A concurrency group cannot express "at most N", so this selects the shape rather than a
   # limit: above 1 the ceiling is the runner fleet, not this number.
   concurrentImplements: 4
+  # Kept at `squash` although `rebase` is this strategy's conventional method, so the
+  # profile warns about it -- deliberately, on both counts. Squash is what this repository
+  # has been running, and it is the harder case: a squashed promotion collapses the
+  # snapshot's many commits into one, so every commit it carried still reads as ahead of the
+  # stage above on the next run. That is what the promotion marker is for.
   mergeMethod: squash
   closeIssueOn: main
   branchNaming: agent/{issue}-{run}

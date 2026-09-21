@@ -1,5 +1,5 @@
 ---
-# Managed by @plainconceptsplatform/workflows@0.5.1. Source: loops/workflows/agent-refine.md. Profile digest: a586f6e065d0. Update with `workflows update --force`; consumer edits may be overwritten.
+# Managed by @plainconceptsplatform/workflows@0.5.1. Source: loops/workflows/agent-refine.md. Profile digest: 17b8a563c65f. Update with `workflows update --force`; consumer edits may be overwritten.
 env:
   REPO_RULES: "Refine only the selected issue into a grounded, implementation-ready user story. Read repository documentation for domain context. Write acceptance criteria that match existing patterns. Do not implement code."
   PLAN_EXPLORE_SKILL: plan-explore
