@@ -1,5 +1,5 @@
 ---
-# Managed by @plainconceptsplatform/workflows@0.5.1. Source: loops/stacks/node-pnpm/pack.yml. Profile digest: edd833fb9ae5. Update with `workflows update --force`; consumer edits may be overwritten.
+# Managed by @plainconceptsplatform/workflows@0.5.1. Source: loops/stacks/node-pnpm/pack.yml. Profile digest: cd84a4273d7e. Update with `workflows update --force`; consumer edits may be overwritten.
 ---
 
 Setup for the node-pnpm toolchain. Ecosystem facts only: this file carries no

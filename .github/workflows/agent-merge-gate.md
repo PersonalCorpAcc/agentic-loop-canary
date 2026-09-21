@@ -1,5 +1,5 @@
 ---
-# Managed by @plainconceptsplatform/workflows@0.5.1. Source: loops/workflows/agent-merge-gate.md. Profile digest: edd833fb9ae5. Update with `workflows update --force`; consumer edits may be overwritten.
+# Managed by @plainconceptsplatform/workflows@0.5.1. Source: loops/workflows/agent-merge-gate.md. Profile digest: cd84a4273d7e. Update with `workflows update --force`; consumer edits may be overwritten.
 env:
   VERIFY_COMMANDS: "pnpm install --frozen-lockfile && pnpm run build && pnpm run test"
   REPO_RULES: "Make a risk-based merge decision for the selected bot pull request. Merge only when CI is green and no risk indicators are present. Review risk indicators defined in the repository's guardrails or project documentation. Any of these require human review. Do not merge protected file changes."
@@ -13,12 +13,12 @@ env:
   PR_PENDING_LABEL: pr-pending
   # How the forge merges here. A profile value, because a rebase repository and a squash
   # repository disagree about what a merge even is (FR-026).
-  MERGE_METHOD: "rebase"
+  MERGE_METHOD: "squash"
   # What happens to a conflict. Under `merge-target` the agent merges the base in and
   # resolves, which is all it can do: its push applies a bundle fast-forward only, so a
   # rebase would be computed, refused and lost. Under `human` it does not try at all
   # (FR-027, FR-028).
-  CONFLICT_RESOLUTION: "human"
+  CONFLICT_RESOLUTION: "merge-target"
   # Which label an issue must carry for the gate to act, per stage the pull request could
   # target: `stage=label`, comma separated. The first stage requires the implement label,
   # because the change has only just been implemented; every later stage requires the
@@ -135,6 +135,9 @@ jobs:
           token: ${{ github.token }}
           pr-number: ${{ inputs.pr-number }}
           ci-conclusion: ${{ inputs.ci-conclusion }}
+          # Declared since the route was written and passed to nothing until 19/09/2026
+          # (T247). Without it the failing logs are never fetched.
+          ci-run-id: ${{ inputs.ci-run-id }}
           linked-issue: ${{ inputs.linked-issue }}
           require-label: ${{ env.IMPLEMENT_LABEL }}
           stage-labels: ${{ env.STAGE_LABELS }}
@@ -271,7 +274,7 @@ jobs:
       issues: write
     steps:
       - name: Checkout workflow actions
-        if: needs.protected_changes.outputs.requires_review == 'true' && needs.subject.outputs.conclusion != 'failure'
+        if: (needs.protected_changes.outputs.requires_review == 'true' && needs.subject.outputs.conclusion != 'failure') || needs.subject.outputs.review_blocked == 'true'
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
@@ -315,6 +318,17 @@ jobs:
             ${{ needs.protected_changes.outputs.files }}
 
             **Verdict:** review
+      # The loop is waiting for a person, which is a state, not a failure. Recorded where
+      # every other verdict is recorded, so the run reads the same way as any other (T246).
+      - name: Say that a reviewer has this pull request
+        if: needs.subject.outputs.review_blocked == 'true'
+        uses: ./.github/actions/record-outcome
+        with:
+          outcome: handed-to-human
+          reason: changes-requested
+          route: merge-gate
+          subject: ${{ format('#{0}', needs.subject.outputs.pr) }}
+          detail: "A reviewer has requested changes on this pull request, so the gate leaves it alone until those threads are resolved. Answering a review is apply-review's job, not the gate's."
 
   reserve:
     needs: subject
@@ -649,9 +663,15 @@ jobs:
           detail: "${{ steps.arm.outputs.armed == 'true' && 'The pull request is marked ready; the forge merges it when the rule holding it is satisfied.' || (needs.validate_output.outputs.outcome == 'merge' && needs.subject.outputs.auto_merge == 'true') && 'The pull request was merged.' || needs.validate_output.outputs.outcome == 'review' && 'The gate asked for a human; the assessment is on the issue.' || needs.validate_output.outputs.outcome == 'invalid' && 'The gate reached no verdict on this run.' || 'The gate approved the pull request; this repository does not merge into that branch unattended, so it waits for a person.' }}"
   incomplete:
     needs: [subject, protected_changes, agent, safe_outputs, validate_output]
+    # A pull request a reviewer has asked to change is not an incomplete run: the agent was
+    # never meant to start. Saying so here would be four "ended without an outcome" comments
+    # in four minutes, one per CI event, with an attempt counter that stays at 0 because the
+    # job that increments it never runs -- so the park-at-5 safety could never fire either
+    # (T246). review_required says the true thing instead.
     if: >
        always() &&
        needs.subject.outputs.found == 'true' &&
+       needs.subject.outputs.review_blocked != 'true' &&
        (needs.protected_changes.outputs.requires_review != 'true' || needs.subject.outputs.conclusion == 'failure') &&
        (
          needs.agent.result != 'success' ||
