@@ -43,7 +43,18 @@ export function App(): ReactElement {
         {ordered.map((run) => (
           <li key={run.id} data-attention={needsAttention(run)}>
             <a href={run.url}>{run.route}</a>
-            <span>{run.subject}</span>
+            {run.carriedIssues === undefined ? (
+              <span>{run.subject}</span>
+            ) : (
+              <span>
+                {run.carriedIssues.map((issue, index) => (
+                  <span key={issue}>
+                    {index > 0 ? ", " : ""}
+                    <a href={issueUrl(run.url, issue)}>#{issue}</a>
+                  </span>
+                ))}
+              </span>
+            )}
             <span>{run.reason}</span>
             <time dateTime={run.startedAt}>{new Date(run.startedAt).toLocaleTimeString()}</time>
           </li>
@@ -66,6 +77,13 @@ export function socketUrl(from: Pick<Location, "protocol" | "host" | "hostname">
   // both, so the page's host is the right answer.
   const host = from.host.includes(":5173") ? `${from.hostname}:8787` : from.host;
   return `${scheme}//${host}/events`;
+}
+
+/** An issue's page on the same repository a run's own `html_url` names, since the server
+ *  never tells the page which repository it is watching. */
+export function issueUrl(runUrl: string, issue: number): string {
+  const match = /^(https:\/\/github\.com\/[^/]+\/[^/]+)\//.exec(runUrl);
+  return match === null ? `#${issue}` : `${match[1]}/issues/${issue}`;
 }
 
 /** Attention first, then unfinished, then newest. */

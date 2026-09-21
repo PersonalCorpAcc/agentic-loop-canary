@@ -23,6 +23,14 @@ export interface LoopRun {
   readonly finishedAt?: string;
   readonly conclusion?: string;
   readonly url: string;
+  /**
+   * Under `env-promotion` a promotion pull request's head is a snapshot of the stage below,
+   * so it carries every issue that landed there since the last promotion, not just one. When
+   * `subject` names such a pull request, this is every issue its body marks with
+   * `<!-- implement-issue: N -->`, oldest first. Absent for a run whose subject is not a
+   * promotion pull request, so an ordinary row is unchanged.
+   */
+  readonly carriedIssues?: readonly number[];
 }
 
 /** What the server pushes over the socket as runs begin and end. */
