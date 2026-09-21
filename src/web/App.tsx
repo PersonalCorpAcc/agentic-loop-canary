@@ -13,7 +13,6 @@ import { needsAttention } from "../shared/types.js";
 export function App(): ReactElement {
   const [runs, setRuns] = useState<readonly LoopRun[]>([]);
   const [live, setLive] = useState(false);
-  const [degraded, setDegraded] = useState(false);
 
   useEffect(() => {
     const socket = new WebSocket(socketUrl(location));
@@ -21,14 +20,9 @@ export function App(): ReactElement {
     socket.addEventListener("close", () => setLive(false));
     socket.addEventListener("message", (message) => {
       const event = JSON.parse(String(message.data)) as LoopEvent;
-      if (event.kind === "snapshot") {
-        setRuns(event.runs);
-        setDegraded(event.degraded);
-      } else if (event.kind === "run") {
-        setRuns((current) => [event.run, ...current.filter((run) => run.id !== event.run.id)]);
-      } else {
-        setDegraded(event.degraded);
-      }
+      setRuns((current) => event.kind === "snapshot"
+        ? event.runs
+        : [event.run, ...current.filter((run) => run.id !== event.run.id)]);
     });
     return () => socket.close();
   }, []);
@@ -41,7 +35,7 @@ export function App(): ReactElement {
       <header>
         <h1>loopscope</h1>
         <p>
-          {statusText(live, degraded)} · {runs.length} run(s)
+          {live ? "live" : "reconnecting"} · {runs.length} run(s)
           {waiting > 0 ? ` · ${waiting} waiting for a person` : ""}
         </p>
       </header>
@@ -72,18 +66,6 @@ export function socketUrl(from: Pick<Location, "protocol" | "host" | "hostname">
   // both, so the page's host is the right answer.
   const host = from.host.includes(":5173") ? `${from.hostname}:8787` : from.host;
   return `${scheme}//${host}/events`;
-}
-
-/**
- * What the header says about freshness.
- *
- * `live` tracks the socket; `degraded` tracks whether the server's own polling is keeping up.
- * They're deliberately kept apart: a reconnecting socket means check your network, a degraded
- * poll means check the GitHub token, and collapsing them into one word would hide which.
- */
-export function statusText(live: boolean, degraded: boolean): string {
-  if (!live) return "reconnecting";
-  return degraded ? "live, data may be stale" : "live";
 }
 
 /** Attention first, then unfinished, then newest. */

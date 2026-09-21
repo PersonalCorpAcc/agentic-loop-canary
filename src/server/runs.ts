@@ -35,31 +35,7 @@ export function routeOf(run: Pick<ApiRun, "name" | "display_title">): string {
   return run.name;
 }
 
-/** Thrown when the forge's run list can't be read; `rateLimited` is the 403/429 case. */
-export class RunsFetchError extends Error {
-  readonly rateLimited: boolean;
-
-  constructor(message: string, rateLimited: boolean) {
-    super(message);
-    this.name = "RunsFetchError";
-    this.rateLimited = rateLimited;
-  }
-}
-
-export interface RunsFetchResult {
-  readonly runs: LoopRun[];
-  /** `x-ratelimit-remaining` off the response, when the forge sent one. */
-  readonly rateLimitRemaining: number | null;
-}
-
-function rateLimitRemainingOf(response: Response): number | null {
-  const header = response.headers.get("x-ratelimit-remaining");
-  if (header === null) return null;
-  const remaining = Number(header);
-  return Number.isNaN(remaining) ? null : remaining;
-}
-
-export async function listRuns(limit = 50): Promise<RunsFetchResult> {
+export async function listRuns(limit = 50): Promise<LoopRun[]> {
   const response = await fetch(`https://api.github.com/repos/${repo}/actions/runs?per_page=${limit}`, {
     headers: {
       accept: "application/vnd.github+json",
@@ -67,21 +43,17 @@ export async function listRuns(limit = 50): Promise<RunsFetchResult> {
       ...(token === "" ? {} : { authorization: `Bearer ${token}` }),
     },
   });
-  const rateLimitRemaining = rateLimitRemainingOf(response);
-  if (!response.ok) {
-    const rateLimited = response.status === 403 || response.status === 429;
-    throw new RunsFetchError(`the forge answered ${response.status}`, rateLimited);
-  }
+  if (!response.ok) throw new Error(`the forge answered ${response.status}`);
 
   const body = await response.json() as { workflow_runs?: ApiRun[] };
-  const runs = (body.workflow_runs ?? []).map((run) => ({
+  return (body.workflow_runs ?? []).map((run) => ({
     id: run.id,
     route: routeOf(run),
     // The run list does not carry the loop's own outcome line, so a finished run is described
     // by its conclusion until the log reader exists. `unknown` is honest; inventing `acted`
     // from `success` would not be, because a successful run that decided to do nothing is the
     // single most common thing this loop does.
-    outcome: "unknown" as const,
+    outcome: "unknown",
     reason: run.conclusion ?? run.status,
     subject: subjectOf(run.display_title),
     startedAt: run.created_at,
@@ -89,7 +61,6 @@ export async function listRuns(limit = 50): Promise<RunsFetchResult> {
     ...(run.conclusion === null ? {} : { conclusion: run.conclusion }),
     url: run.html_url,
   }));
-  return { runs, rateLimitRemaining };
 }
 
 /** `#25` out of a run title, when the title names one. */
