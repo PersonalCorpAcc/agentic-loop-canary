@@ -41,12 +41,16 @@ reason="stages-aligned"
 note() { echo "$*"; }
 
 # One run looks at every pair in the chain, so it collects several answers and reports one
-# (FR-058). A pull request that was opened outweighs anything skipped afterwards; among the
-# skips the ranking is how much each wants a person, because letting the last one win hides
-# the ones that do.
+# (FR-058). The ranking is how much each answer wants a person, because letting the last one
+# win hides the ones that do -- and a conflict wants one more than an opened pull request
+# does, so it outranks that too. A run that repairs two hops and hands a third over is
+# ordinary now that every detached hop is repaired in the same pass, and reporting it as
+# `acted` would be the last-one-wins mistake in a different costume (FR-086).
 skipped_because() {
   local candidate="$1" entry
-  [ "$opened" -eq 0 ] || return 0
+  if [ "$candidate" != "conflict-handed-off" ] && [ "$opened" -ne 0 ]; then
+    return 0
+  fi
   for entry in conflict-handed-off already-present stages-aligned; do
     case "$entry" in
       "$candidate") reason="$candidate"; return 0 ;;
@@ -56,6 +60,9 @@ skipped_because() {
 }
 
 finish() {
+  # `acted` is the answer when something was opened and nothing was handed over: the
+  # hand-off is set by skipped_because and outranks it.
+  [ "$opened" -eq 0 ] || [ "$reason" = "conflict-handed-off" ] || reason="acted"
   {
     echo "opened=${opened}"
     echo "reason=${reason}"
@@ -150,13 +157,23 @@ for (( index=${#stages[@]} - 1; index > 0; index-- )); do
     [ "$already" = true ] || to_pick+=("$sha")
   done
 
-  if [ "${#to_pick[@]}" -eq 0 ]; then
-    note "${earlier} already carries the content of every commit on ${later}; the shas differ because promotion rebases."
+  # Content is half the question, and on its own it is the wrong half. Under a rebase
+  # promotion the earlier stage always carries the content already -- that is what
+  # promotion did -- so a content-only test reports every hop aligned and the histories
+  # stay apart for ever. The merge below is guarded by the question that matters, and this
+  # exit used to return before reaching it (FR-086).
+  if [ "${#to_pick[@]}" -eq 0 ] &&
+     git merge-base --is-ancestor "refs/remotes/origin/${later}" "refs/remotes/origin/${earlier}"; then
+    note "${earlier} already carries the content of every commit on ${later}, and contains them."
     skipped_because "stages-aligned"
     continue
   fi
 
-  note "${earlier} is missing ${#to_pick[@]} commit(s) that ${later} has."
+  if [ "${#to_pick[@]}" -eq 0 ]; then
+    note "${earlier} carries the content of every commit on ${later} but does not contain them: this is the merge-base repair, and the merge will change no file."
+  else
+    note "${earlier} is missing ${#to_pick[@]} commit(s) that ${later} has."
+  fi
 
   sync_branch="sync/${earlier}-${GITHUB_RUN_ID:-0}"
 
@@ -224,7 +241,7 @@ for (( index=${#stages[@]} - 1; index > 0; index-- )); do
 
 A change reached \`${later}\` without coming up the chain -- a hotfix, an administrative push, or a revert -- so \`${earlier}\` does not have it. Until it does, every pull request into \`${earlier}\` carries this delta as well as its own change, which trips the protected-files rule and hands work to a person that nobody needed to look at.
 
-Commits missing by content: ${#to_pick[@]}. This is a **merge**, not a replay: the content is only half of it, and the other half is that \`${earlier}\` should contain \`${later}\`'s commits, so that a pull request into \`${earlier}\` diffs against the right point. **Auto-merge is armed on this, with a merge commit**, so it lands on its own once its checks pass; if arming was refused -- usually because **Allow auto-merge** is off for this repository -- merge it by hand, **with a merge commit**. Squashing it would carry the content and leave the histories apart, which is the state this pull request exists to end; GitHub will not offer rebase, because the head is a merge.
+Commits missing by content: ${#to_pick[@]}. Zero is a reason to merge, not a reason not to: it means the content travelled and the history did not, which is the state that makes every pull request into \`${earlier}\` diff against the wrong point. This is a **merge**, not a replay: the content is only half of it, and the other half is that \`${earlier}\` should contain \`${later}\`'s commits, so that a pull request into \`${earlier}\` diffs against the right point. Where this repository merges into \`${earlier}\` unattended, **auto-merge is armed on this with a merge commit** and it lands on its own once its checks pass; where it does not, or where arming was refused -- usually because **Allow auto-merge** is off -- merge it by hand, **with a merge commit**. Squashing it would carry the content and leave the histories apart, which is the state this pull request exists to end; GitHub will not offer rebase, because the head is a merge.
 
 Nothing on \`${later}\` was touched, and nothing on \`${earlier}\` is removed by this.
 
@@ -240,7 +257,20 @@ Nothing on \`${later}\` was touched, and nothing on \`${earlier}\` is removed by
   # rather than announced. A merge commit whatever `branching.mergeMethod` says: the head is
   # a merge, the forge will not offer rebase for it, and a squash would carry the content and
   # leave the histories apart, which is the state this pull request exists to end (FR-086).
-  if [ -n "${new_pr:-}" ]; then
+  # Whether the loop may merge into this stage without a person is the adopter's answer,
+  # not this route's: `autoMerge.mode` and `autoMerge.targets` say it for every other merge
+  # the loop makes, and a carry-down that ignored them would be the package deciding an
+  # adopter's policy (FR-086, FR-080).
+  may_arm=false
+  if [ "${AUTO_MERGE_MODE:-off}" != "off" ]; then
+    case ",${AUTO_MERGE_TARGETS:-}," in
+      *",${earlier},"*) may_arm=true ;;
+    esac
+  fi
+
+  if [ -n "${new_pr:-}" ] && [ "$may_arm" != true ]; then
+    note "#${new_pr} waits for a person: this repository does not merge into ${earlier} unattended (autoMerge.mode=${AUTO_MERGE_MODE:-off}, targets=${AUTO_MERGE_TARGETS:-none}). Until it lands, a branch cut from ${later} cannot be merged into ${earlier}."
+  elif [ -n "${new_pr:-}" ]; then
     if armed="$(gh pr merge "$new_pr" --repo "$REPO" --merge --auto 2>&1)"; then
       note "Auto-merge armed on #${new_pr}: it lands as a merge commit when its checks pass."
     else
@@ -250,7 +280,7 @@ Nothing on \`${later}\` was touched, and nothing on \`${earlier}\` is removed by
     fi
   fi
   opened=$((opened + 1))
-  reason="acted"
+  [ "$reason" = "conflict-handed-off" ] || reason="acted"
   git switch --detach "refs/remotes/origin/${earlier}" >/dev/null 2>&1 || true
 done
 
