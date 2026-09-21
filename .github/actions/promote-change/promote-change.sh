@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Managed by @plainconceptsplatform/workflows@0.5.1. Source: loops/actions/promote-change/promote-change.sh. Profile digest: edd833fb9ae5. Update with `workflows update --force`; consumer edits may be overwritten.
+# Managed by @plainconceptsplatform/workflows@0.5.1. Source: loops/actions/promote-change/promote-change.sh. Profile digest: cd84a4273d7e. Update with `workflows update --force`; consumer edits may be overwritten.
 #
 # Move the changes that are ready one stage along the chain (FR-031).
 #
@@ -277,7 +277,13 @@ for index in "${!stages[@]}"; do
     # excluded because a re-run must not duplicate what it already carried across.
     mapfile -t present < <(
       patch_ids_of "refs/remotes/origin/${next}"
-      [ -z "${BRANCH_POINT:-}" ] || patch_ids_of "refs/remotes/origin/${BRANCH_POINT}"
+      # ...unless the branch point is the first stage, where it is the stage a change is
+      # promoted *from* and its commits are the change itself. Excluding it there would
+      # filter out everything and no change would ever travel, which is why that shape used
+      # to be refused outright rather than defaulted to (FR-086).
+      if [ -n "${BRANCH_POINT:-}" ] && [ "${BRANCH_POINT}" != "${stages[0]:-}" ]; then
+        patch_ids_of "refs/remotes/origin/${BRANCH_POINT}"
+      fi
     )
 
     to_pick=()
