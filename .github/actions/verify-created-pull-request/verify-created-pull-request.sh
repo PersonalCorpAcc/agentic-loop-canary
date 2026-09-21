@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Managed by @plainconceptsplatform/workflows@0.5.1. Source: loops/actions/verify-created-pull-request/verify-created-pull-request.sh. Profile digest: cd84a4273d7e. Update with `workflows update --force`; consumer edits may be overwritten.
+# Managed by @plainconceptsplatform/workflows@0.5.1. Source: loops/actions/verify-created-pull-request/verify-created-pull-request.sh. Profile digest: a586f6e065d0. Update with `workflows update --force`; consumer edits may be overwritten.
 #
 # The pull request the framework says it made, checked against what it should be (FR-061).
 #

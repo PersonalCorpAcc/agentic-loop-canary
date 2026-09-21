@@ -1,5 +1,5 @@
 ---
-# Managed by @plainconceptsplatform/workflows@0.5.1. Source: loops/workflows/agent-merge-gate.md. Profile digest: cd84a4273d7e. Update with `workflows update --force`; consumer edits may be overwritten.
+# Managed by @plainconceptsplatform/workflows@0.5.1. Source: loops/workflows/agent-merge-gate.md. Profile digest: a586f6e065d0. Update with `workflows update --force`; consumer edits may be overwritten.
 env:
   VERIFY_COMMANDS: "pnpm install --frozen-lockfile && pnpm run build && pnpm run test"
   REPO_RULES: "Make a risk-based merge decision for the selected bot pull request. Merge only when CI is green and no risk indicators are present. Review risk indicators defined in the repository's guardrails or project documentation. Any of these require human review. Do not merge protected file changes."
@@ -95,7 +95,7 @@ on:
 # values and `on.steps` outputs do not reach the agent job.
 jobs:
   subject:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     permissions:
       contents: read
       issues: read
@@ -208,7 +208,7 @@ jobs:
   protected_changes:
     needs: subject
     if: needs.subject.outputs.found == 'true'
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     permissions:
       pull-requests: read
     outputs:
@@ -268,7 +268,7 @@ jobs:
     # gh-aw makes the agent depend on custom jobs. Keep this job successful when
     # there are no protected files instead of skipping it and blocking remediation.
     if: always() && needs.subject.outputs.found == 'true'
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     permissions:
       contents: read
       issues: write
@@ -333,7 +333,7 @@ jobs:
   reserve:
     needs: subject
     if: needs.subject.outputs.found == 'true'
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     permissions:
       contents: read
       issues: write
@@ -416,7 +416,7 @@ jobs:
       always() &&
       needs.agent.result == 'success' &&
       needs.safe_outputs.result == 'success'
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     permissions:
       contents: read
     outputs:
@@ -446,7 +446,7 @@ jobs:
         needs.safe_outputs.result == 'success' &&
         needs.validate_output.outputs.valid == 'true' &&
        (needs.protected_changes.outputs.requires_review != 'true' || needs.validate_output.outputs.outcome != 'merge')
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     permissions:
       contents: write
       issues: write
@@ -678,7 +678,7 @@ jobs:
          needs.safe_outputs.result != 'success' ||
          needs.validate_output.outputs.valid != 'true'
        )
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     permissions:
       contents: read
       issues: write
@@ -748,8 +748,8 @@ jobs:
 
 if: always() && needs.subject.outputs.found == 'true' && (needs.protected_changes.outputs.requires_review != 'true' || needs.subject.outputs.conclusion == 'failure') && needs.subject.outputs.review_blocked != 'true' && needs.reserve.outputs.conflict_blocked != 'true'
 
-runs-on: ubuntu-latest
-runs-on-slim: ubuntu-latest
+runs-on: ubuntu-24.04
+runs-on-slim: ubuntu-24.04
 
 engine:
   id: claude

@@ -1,5 +1,5 @@
 ---
-# Managed by @plainconceptsplatform/workflows@0.5.1. Source: loops/workflows/agent-apply-review.md. Profile digest: cd84a4273d7e. Update with `workflows update --force`; consumer edits may be overwritten.
+# Managed by @plainconceptsplatform/workflows@0.5.1. Source: loops/workflows/agent-apply-review.md. Profile digest: a586f6e065d0. Update with `workflows update --force`; consumer edits may be overwritten.
 env:
   # Printed by the prompt as the verification block. Consumers set their own commands.
   VERIFY_COMMANDS: "pnpm install --frozen-lockfile && pnpm run build && pnpm run test"
@@ -48,7 +48,7 @@ on:
 # substantive feedback. A custom job, not `on.steps`, because the prompt needs these values.
 jobs:
   subject:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     permissions:
       contents: read
       issues: read
@@ -145,7 +145,7 @@ jobs:
   reserve:
     needs: subject
     if: needs.subject.outputs.found == 'true' && needs.subject.outputs.issue != ''
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     permissions:
       contents: read
       issues: write
@@ -175,7 +175,7 @@ jobs:
   validate_output:
     needs: [activation, subject, agent, safe_outputs]
     if: always() && needs.agent.result == 'success' && needs.safe_outputs.result == 'success'
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     permissions:
       contents: read
       pull-requests: read
@@ -213,7 +213,7 @@ jobs:
       needs.agent.result == 'success' &&
       needs.safe_outputs.result == 'success' &&
       needs.validate_output.outputs.valid == 'true'
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     permissions:
       contents: write
       issues: write
@@ -274,7 +274,7 @@ jobs:
       always() &&
       needs.subject.outputs.found == 'true' &&
       (needs.agent.result != 'success' || needs.safe_outputs.result != 'success' || needs.validate_output.outputs.valid != 'true')
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     permissions:
       contents: read
       issues: write
@@ -313,8 +313,8 @@ jobs:
 
 if: needs.subject.outputs.found == 'true'
 
-runs-on: ubuntu-latest
-runs-on-slim: ubuntu-latest
+runs-on: ubuntu-24.04
+runs-on-slim: ubuntu-24.04
 
 engine:
   id: claude
