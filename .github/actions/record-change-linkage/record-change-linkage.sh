@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Managed by @plainconceptsplatform/workflows@0.5.1. Source: loops/actions/record-change-linkage/record-change-linkage.sh. Profile digest: cd84a4273d7e. Update with `workflows update --force`; consumer edits may be overwritten.
+# Managed by @plainconceptsplatform/workflows@0.5.1. Source: loops/actions/record-change-linkage/record-change-linkage.sh. Profile digest: a586f6e065d0. Update with `workflows update --force`; consumer edits may be overwritten.
 #
 # The authoritative link between an issue and its change is a comment this App wrote
 # (FR-064). A marker in a body is not: any human can type one invisibly, and a body is

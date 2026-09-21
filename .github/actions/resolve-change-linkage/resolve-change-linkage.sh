@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Managed by @plainconceptsplatform/workflows@0.5.1. Source: loops/actions/resolve-change-linkage/resolve-change-linkage.sh. Profile digest: cd84a4273d7e. Update with `workflows update --force`; consumer edits may be overwritten.
+# Managed by @plainconceptsplatform/workflows@0.5.1. Source: loops/actions/resolve-change-linkage/resolve-change-linkage.sh. Profile digest: a586f6e065d0. Update with `workflows update --force`; consumer edits may be overwritten.
 #
 # Which pull request and branch belong to this change, read from the comment the App wrote
 # (FR-064).
