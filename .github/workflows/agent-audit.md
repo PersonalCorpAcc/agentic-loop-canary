@@ -1,5 +1,5 @@
 ---
-# Managed by @plainconceptsplatform/workflows@0.5.1. Source: loops/workflows/agent-audit.md. Profile digest: cd84a4273d7e. Update with `workflows update --force`; consumer edits may be overwritten.
+# Managed by @plainconceptsplatform/workflows@0.5.1. Source: loops/workflows/agent-audit.md. Profile digest: a586f6e065d0. Update with `workflows update --force`; consumer edits may be overwritten.
 env:
   REPO_RULES: "Read-only repository audit. Report only reproducible, actionable defects with evidence. Look for: architectural layer violations, missing tests, security gaps, performance issues, and documentation drift. Do not modify files, commit, push, or run write operations."
   REPO_AUDIT_SKILL: repo-audit
@@ -44,8 +44,8 @@ on:
     query: "is:issue is:open label:audit"
     max: 3
 
-runs-on: ubuntu-latest
-runs-on-slim: ubuntu-latest
+runs-on: ubuntu-24.04
+runs-on-slim: ubuntu-24.04
 
 engine:
   id: claude
@@ -71,7 +71,7 @@ jobs:
       needs.agent.result == 'success' &&
       needs.safe_outputs.result == 'success' &&
       needs.safe_outputs.outputs.process_safe_outputs_processed_count != '0'
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     permissions:
       contents: read
       issues: write

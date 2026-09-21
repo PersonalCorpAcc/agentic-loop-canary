@@ -6,10 +6,13 @@
 version: 1
 name: loopscope
 
+# Pinned rather than `ubuntu-latest`: that label migrates to Ubuntu 26 on 19/10/2026, and a
+# runner image changing under a loop nobody is watching is how a green repository goes red
+# on a date nobody wrote down. Moving it is a profile edit and a reinstall, deliberately.
 runners:
-  agent: [ubuntu-latest]
-  slim: [ubuntu-latest]
-  ci: [ubuntu-latest]
+  agent: [ubuntu-24.04]
+  slim: [ubuntu-24.04]
+  ci: [ubuntu-24.04]
 
 # The engine and the model the agents run on (FR-075 to FR-077).
 #
