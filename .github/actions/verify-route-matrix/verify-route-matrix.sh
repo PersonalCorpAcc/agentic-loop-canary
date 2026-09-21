@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Managed by @plainconceptsplatform/workflows@0.5.1. Source: loops/actions/verify-route-matrix/verify-route-matrix.sh. Profile digest: a586f6e065d0. Update with `workflows update --force`; consumer edits may be overwritten.
+# Managed by @plainconceptsplatform/workflows@0.5.1. Source: loops/actions/verify-route-matrix/verify-route-matrix.sh. Profile digest: 17b8a563c65f. Update with `workflows update --force`; consumer edits may be overwritten.
 # Exercise the router's real classifier. This sources classify-route.sh rather than
 # restating it, so a change to the route table cannot pass here by being copied twice.
 #
@@ -583,7 +583,7 @@ if [ "$STRATEGY_OK" -eq 1 ]; then
       assert_route "a sync-stages dispatch under trunk routes nowhere" none \
         EVENT=workflow_dispatch OPERATION=sync-stages
       ;;
-    branch-chain)
+    branch-chain | env-promotion)
       # A chain, a promotion schedule, and a deterministic job named `promote`, never
       # `call-promote`: that prefix is reserved for callers with an inner agent job and the
       # metrics match on it.
@@ -661,10 +661,100 @@ if [ "$STRATEGY_OK" -eq 1 ]; then
         assert_route "the sync-stages cron routes to sync-stages" sync-stages \
           EVENT=schedule "SCHEDULE=${SYNC_STAGES_CRON}"
       fi
+
+      # Everything above is shared with env-promotion, which is a chain by every other
+      # measure. What separates it is how a promotion head is built, and that is what the
+      # rest of this arm checks: a snapshot of the stage below, carrying a set of changes
+      # rather than one, with no cherry-pick anywhere near it (FR-031, FR-056).
+      if [ "$BRANCH_STRATEGY" = "env-promotion" ]; then
+        if [ -f "$PROMOTE_SCRIPT" ]; then
+          grep -q 'promote_by_snapshot' "$PROMOTE_SCRIPT" ||
+            { STRATEGY_OK=0; echo "FAIL: this repository promotes by snapshot but the promotion route has no snapshot path, so it would try to cherry-pick a change onto the next stage" >&2; }
+          # The head is a new branch at one commit, and a force-push is the one thing that
+          # would make it a moving target again: a reviewer would be approving a head that
+          # had changed under them.
+          if grep -E '^\s*git push' "$PROMOTE_SCRIPT" | grep -q 'force'; then
+            grep -q 'git push origin "HEAD:refs/heads/${snapshot_branch}"' "$PROMOTE_SCRIPT" ||
+              { STRATEGY_OK=0; echo "FAIL: the snapshot head is force-pushed; a promotion head that can move is one a person cannot have reviewed" >&2; }
+          fi
+          # A snapshot carries everything under its commit, so one issue is never the whole
+          # answer: the route writes one marker per carried issue and FR-051 reads them all.
+          grep -q 'issues_behind' "$PROMOTE_SCRIPT" ||
+            { STRATEGY_OK=0; echo "FAIL: the promotion route does not enumerate the issues a snapshot carries, so a promotion would be labelled and closed for one of them" >&2; }
+        fi
+        # The name the snapshot takes has to be one the branch-write guard allows, or the
+        # route refuses its own head on every run and nothing ever promotes (FR-063).
+        SNAPSHOT_TEMPLATE="promote/{stage}-{sha}"
+        case "$SNAPSHOT_TEMPLATE" in
+          promote/*) ;;
+          *)
+            STRATEGY_OK=0
+            echo "FAIL: the snapshot head template '${SNAPSHOT_TEMPLATE}' is not a promotion branch, so the branch-write guard would refuse every promotion this repository tried to open" >&2
+            ;;
+        esac
+        # The gate runs on a promotion pull request although it has no single issue, and it
+        # can only do that if the subject reads the marker set (FR-056).
+        GATE_SUBJECT="${HERE}/../identify-gate-subject/action.yml"
+        if [ -f "$GATE_SUBJECT" ]; then
+          grep -q 'pr_issues' "$GATE_SUBJECT" ||
+            { STRATEGY_OK=0; echo "FAIL: the gate subject reads one issue, so a promotion pull request carrying several would be gated against the first of them" >&2; }
+          grep -q 'comment-target=' "$GATE_SUBJECT" ||
+            { STRATEGY_OK=0; echo "FAIL: the gate subject names no comment target, so a promotion's assessment would be posted on one of the issues it carries" >&2; }
+        fi
+      fi
       ;;
-    release-branch | env-promotion)
-      STRATEGY_OK=0
-      echo "FAIL: no rows are written for the '${BRANCH_STRATEGY}' strategy yet; T167 adds env-promotion in Phase 9 and T172 release-branch in Phase 10, each adding its own rows here" >&2
+    release-branch)
+      # No chain, so no stage to promote into: one stage, which is the trunk, and it is
+      # where a change ends however it travelled -- a hotfix goes to a release branch first
+      # and is carried back, so the trunk is still the closing stage (FR-055).
+      [ "$STAGE_COUNT" -eq 1 ] ||
+        { STRATEGY_OK=0; echo "FAIL: release-branch declares ${STAGE_COUNT} stages; it has one, its trunk, and cuts release branches from it" >&2; }
+      [ "${STAGE_BRANCHES[0]}" = "$CUT_FROM" ] ||
+        { STRATEGY_OK=0; echo "FAIL: release-branch's single stage '${STAGE_BRANCHES[0]}' is not its trunk ('${CUT_FROM}')" >&2; }
+      [ "$CLOSE_ISSUE_ON" = "$CUT_FROM" ] ||
+        { STRATEGY_OK=0; echo "FAIL: release-branch closes issues on '${CLOSE_ISSUE_ON}', which is not its trunk '${CUT_FROM}'; a hotfix is carried back, so every change ends on the trunk" >&2; }
+
+      # The pattern is what makes a release branch a stage, so a merge into one is a
+      # transition rather than somebody's own branch. As an extended regular expression: the
+      # classifier, the write guard and the carry-back all feed it to `grep -E`, and a name
+      # template handed to `grep -E` is a rule that silently matches nothing.
+      if [ -z "${RELEASE_PATTERN:-}" ]; then
+        STRATEGY_OK=0
+        echo "FAIL: this repository cuts release branches but the classifier carries no RELEASE_PATTERN, so a merge into one would be nobody's business and the issue would never close" >&2
+      else
+        case "$RELEASE_PATTERN" in
+          *'{'*'}'*)
+            STRATEGY_OK=0
+            echo "FAIL: RELEASE_PATTERN is '${RELEASE_PATTERN}', which is a name template rather than an expression; every reader feeds it to grep -E, where it matches no release branch this repository would ever cut" >&2
+            ;;
+        esac
+      fi
+
+      # The promote route still exists here, and it is what cuts the next release branch on
+      # the cadence. Without its clock the strategy has no mechanism at all.
+      grep -q '^  promote:$' "$ROUTER_YML" ||
+        { STRATEGY_OK=0; echo "FAIL: work-router.yml has no promote job; under release-branch that is the route that cuts the release branch" >&2; }
+      assert_route "a promote dispatch routes to promote" promote \
+        EVENT=workflow_dispatch OPERATION=promote
+      PROMOTE_SCRIPT="${HERE}/../promote-change/promote-change.sh"
+      if [ -f "$PROMOTE_SCRIPT" ]; then
+        grep -q 'cut_release_branch' "$PROMOTE_SCRIPT" ||
+          { STRATEGY_OK=0; echo "FAIL: the promotion route has no release-cutting path, so this repository's release branches would only ever be cut by hand" >&2; }
+      fi
+
+      # A hotfix that lands on the release branch and not on the trunk is lost at the next
+      # cut, which is the one failure this strategy has that the others do not.
+      grep -q '^  hotfix-back:$' "$ROUTER_YML" ||
+        { STRATEGY_OK=0; echo "FAIL: work-router.yml has no hotfix-back job, so a hotfix would stay on its release branch and vanish at the next cut" >&2; }
+
+      # Nothing to hold level: the release branches are meant to diverge from the trunk, and
+      # a route that carried the trunk back down onto them would undo every release.
+      if declare -p SYNC_STAGES_CRON >/dev/null 2>&1; then
+        STRATEGY_OK=0
+        echo "FAIL: release-branch carries a sync-stages cron; its release branches are meant to diverge from the trunk and a carry-down would undo them" >&2
+      fi
+      assert_route "a sync-stages dispatch under release-branch routes nowhere" none \
+        EVENT=workflow_dispatch OPERATION=sync-stages
       ;;
     *)
       STRATEGY_OK=0

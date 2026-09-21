@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Managed by @plainconceptsplatform/workflows@0.5.1. Source: loops/actions/validate-merge-gate-output/validate-merge-gate-output.sh. Profile digest: a586f6e065d0. Update with `workflows update --force`; consumer edits may be overwritten.
+# Managed by @plainconceptsplatform/workflows@0.5.1. Source: loops/actions/validate-merge-gate-output/validate-merge-gate-output.sh. Profile digest: 17b8a563c65f. Update with `workflows update --force`; consumer edits may be overwritten.
 # Print the deterministic merge-gate outcome: merge, approve, review, remediated, or invalid.
 #
 # `merge` and `approve` are the same judgement about the change and different answers to
@@ -11,6 +11,9 @@
 set -euo pipefail
 
 output_file="$1"
+# The number the comment had to be on. An issue for an ordinary pull request; the pull
+# request itself for a promotion, which carries a set of issues and belongs to none of them
+# (FR-056). Nothing here cares which: a comment is matched by the number it targets.
 issue_number="$2"
 ci_conclusion="$3"
 

@@ -1,5 +1,5 @@
 ---
-# Managed by @plainconceptsplatform/workflows@0.5.1. Source: loops/workflows/agent-merge-gate.md. Profile digest: a586f6e065d0. Update with `workflows update --force`; consumer edits may be overwritten.
+# Managed by @plainconceptsplatform/workflows@0.5.1. Source: loops/workflows/agent-merge-gate.md. Profile digest: 17b8a563c65f. Update with `workflows update --force`; consumer edits may be overwritten.
 env:
   VERIFY_COMMANDS: "pnpm install --frozen-lockfile && pnpm run build && pnpm run test"
   REPO_RULES: "Make a risk-based merge decision for the selected bot pull request. Merge only when CI is green and no risk indicators are present. Review risk indicators defined in the repository's guardrails or project documentation. Any of these require human review. Do not merge protected file changes."
@@ -107,6 +107,22 @@ jobs:
       base: ${{ steps.subject.outputs.base }}
       pr: ${{ steps.subject.outputs.pr }}
       issue: ${{ steps.subject.outputs.issue }}
+      # A promotion pull request under `env-promotion` carries several issues rather than
+      # one, so the gate's subject is a set. `issue` stays as the first of them, for the
+      # sentences that name one; `comment_target` is where this run's assessment belongs,
+      # which is the pull request when there is no single issue it is about (FR-056).
+      issues: ${{ steps.subject.outputs.issues }}
+      promotion: ${{ steps.subject.outputs.promotion }}
+      comment_target: ${{ steps.subject.outputs.comment-target }}
+      # What the prompt is told it is looking at. Computed here rather than written as a
+      # conditional in the prompt body, because gh-aw validates the expressions in a runtime
+      # import against a safe list and a ternary is not on it: one in the prompt fails the
+      # whole workflow at `activation`, before the model runs (the same trap `verdict_word`
+      # was written for).
+      subject_clause: ${{ steps.phrasing.outputs.subject_clause }}
+      promotion_note: ${{ steps.phrasing.outputs.promotion_note }}
+      context_instruction: ${{ steps.phrasing.outputs.context_instruction }}
+      handover: ${{ steps.subject.outputs.handover }}
       conclusion: ${{ steps.subject.outputs.conclusion }}
       run-id: ${{ steps.subject.outputs.run-id }}
       review_blocked: ${{ steps.review.outputs.review_blocked }}
@@ -190,6 +206,27 @@ jobs:
             sleep 5
           done
           echo "review_blocked=$([ "$decision" = 'CHANGES_REQUESTED' ] && echo true || echo false)" >> "$GITHUB_OUTPUT"
+      - name: Say what this run is assessing
+        id: phrasing
+        env:
+          PROMOTION: ${{ steps.subject.outputs.promotion }}
+          ISSUE_CONTEXT_PATH: ${{ env.ISSUE_CONTEXT_PATH }}
+          VERIFY_COMMAND: ${{ env.REPO_VERIFY_COMMAND }}
+        run: |
+          set -euo pipefail
+          if [ "${PROMOTION:-false}" = true ]; then
+            echo "subject_clause=promotes a set of changes, one of which is issue" >> "$GITHUB_OUTPUT"
+            {
+              echo "promotion_note<<EOF_NOTE"
+              echo "This is a **promotion**. Its head is a snapshot of the stage below, so it carries several changes, each of which already passed this gate on its way to that stage; its body names every issue it carries. You are not re-assessing them one by one. What you are assessing is the promotion itself: that CI is green on the combination, that nothing in the diff is a file this repository protects, and that the set is what the body says it is. Post your assessment on this pull request, and do not touch any issue."
+              echo "EOF_NOTE"
+            } >> "$GITHUB_OUTPUT"
+            echo "context_instruction=There is no issue context on a promotion: it carries several issues, and any one of their acceptance criteria would be the wrong measure for the rest. The diff and the CI conclusion are what you have, and they are what a promotion is assessed on." >> "$GITHUB_OUTPUT"
+          else
+            echo "subject_clause=closes issue" >> "$GITHUB_OUTPUT"
+            echo "promotion_note=" >> "$GITHUB_OUTPUT"
+            echo "context_instruction=Read \`${ISSUE_CONTEXT_PATH}\`. It contains the issue body and its discussion. When running \`/${VERIFY_COMMAND}\`, the acceptance criteria there define what the implementation must satisfy." >> "$GITHUB_OUTPUT"
+          fi
       - name: Record the outcome
         if: always()
         uses: ./.github/actions/record-outcome
@@ -204,6 +241,59 @@ jobs:
           # what arrived outside the loop had none -- amounted to denying the loop had opened
           # it (FR-084).
           detail: "${{ steps.subject.outputs.found == 'true' && 'This pull request is open, bot-authored and carries the required label, so the gate may run.' || format('Nothing to gate: {0}', steps.subject.outputs.why-not || 'this pull request is not one the gate assesses.') }}"
+
+  # A promotion the gate cannot assess is a person's, and saying so is the whole job.
+  #
+  # `found=false` is the ordinary answer for a pull request the gate has no business with,
+  # and it is silent by design: a repository's human pull requests would otherwise each
+  # collect a comment explaining that the loop is not going to gate them. A promotion whose
+  # carried issues do not all carry the stage below's label is the opposite case -- this loop
+  # opened it, it is carrying real work, and nothing else is going to notice. Its own job,
+  # rather than a write permission on `subject`, so the common path keeps read-only
+  # (FR-056, FR-084).
+  handover:
+    needs: subject
+    if: needs.subject.outputs.handover == 'true'
+    runs-on: ubuntu-24.04
+    permissions:
+      pull-requests: write
+    steps:
+      - name: Checkout workflow actions
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Say on the pull request why the gate did not run
+        uses: ./.github/actions/create-issue-comment
+        with:
+          token: ${{ github.token }}
+          issue-number: ${{ needs.subject.outputs.pr }}
+          # The attempt marker, not the gate marker.
+          #
+          # A hand-over is a gate run that reached no verdict, which is exactly what the
+          # attempt marker means, and reusing it buys the whole belt for free: the reconcile
+          # sweep counts this against the six-attempt budget and stops re-dispatching once it
+          # is spent, so a promotion nobody fixes collects six comments rather than one every
+          # half hour for the rest of the week. The gate marker is reserved for a verdict --
+          # the route matrix pins its count at four, and that invariant is what keeps "the
+          # gate decided" distinguishable from "the gate ran".
+          body: |
+            ${{ env.ATTEMPT_MARKER }}
+            The merge gate did not assess this pull request: ${{ needs.subject.outputs.why_not }}
+
+            Nothing has been changed and no label has moved. A promotion is a snapshot of the
+            stage below and cannot leave one of its changes behind, so this is a person's to
+            resolve -- by labelling the change that is missing its stage label, or by closing
+            this pull request, which holds every change it carries until somebody says
+            otherwise.
+      - name: Record the outcome
+        if: always()
+        uses: ./.github/actions/record-outcome
+        with:
+          outcome: handed-to-human
+          reason: missing-required-label
+          route: merge-gate
+          subject: ${{ format('#{0}', needs.subject.outputs.pr) }}
+          detail: "${{ needs.subject.outputs.why_not }}"
 
   protected_changes:
     needs: subject
@@ -290,14 +380,14 @@ jobs:
       # here left a board where three issues with three open pull requests looked like they
       # had none. The merge path is the one place the label stops being true.
       - name: Release the issue
-        if: needs.protected_changes.outputs.requires_review == 'true' && needs.subject.outputs.conclusion != 'failure'
+        if: needs.subject.outputs.promotion != 'true' && (needs.protected_changes.outputs.requires_review == 'true' && needs.subject.outputs.conclusion != 'failure')
         uses: ./.github/actions/remove-issue-labels
         with:
           token: ${{ steps.app-token.outputs.token }}
           issue-number: ${{ needs.subject.outputs.issue }}
           labels: ${{ env.WORKING_LABEL }}
       - name: Flag human review
-        if: needs.protected_changes.outputs.requires_review == 'true' && needs.subject.outputs.conclusion != 'failure'
+        if: needs.subject.outputs.promotion != 'true' && (needs.protected_changes.outputs.requires_review == 'true' && needs.subject.outputs.conclusion != 'failure')
         uses: ./.github/actions/add-issue-labels
         with:
           token: ${{ steps.app-token.outputs.token }}
@@ -308,7 +398,7 @@ jobs:
         uses: ./.github/actions/create-issue-comment
         with:
           token: ${{ steps.app-token.outputs.token }}
-          issue-number: ${{ needs.subject.outputs.issue }}
+          issue-number: ${{ needs.subject.outputs.comment_target }}
           body: |
             ${{ env.GATE_MARKER }}
             PR #${{ needs.subject.outputs.pr }} changes protected files and cannot be auto-merged.
@@ -381,7 +471,7 @@ jobs:
           echo "blocked=true" >> "$GITHUB_OUTPUT"
           echo "PR #${{ needs.subject.outputs.pr }} conflicts and this repository resolves conflicts by ${CONFLICT_RESOLUTION}; the agent will not be started."
       - name: Hand the conflict to a human
-        if: steps.conflict-mode.outputs.blocked == 'true'
+        if: needs.subject.outputs.promotion != 'true' && (steps.conflict-mode.outputs.blocked == 'true')
         uses: ./.github/actions/add-issue-labels
         with:
           token: ${{ steps.app-token.outputs.token }}
@@ -392,7 +482,7 @@ jobs:
         uses: ./.github/actions/create-issue-comment
         with:
           token: ${{ steps.app-token.outputs.token }}
-          issue-number: ${{ needs.subject.outputs.issue }}
+          issue-number: ${{ needs.subject.outputs.comment_target }}
           body: |
             ${{ env.GATE_MARKER }}
             PR #${{ needs.subject.outputs.pr }} conflicts with its base, and this repository
@@ -406,7 +496,7 @@ jobs:
         uses: ./.github/actions/create-issue-comment
         with:
           token: ${{ steps.app-token.outputs.token }}
-          issue-number: ${{ needs.subject.outputs.issue }}
+          issue-number: ${{ needs.subject.outputs.comment_target }}
           body: |
             Problems found in PR #${{ needs.subject.outputs.pr }}. ${{ steps.conflicts.outputs.has_conflicts == 'true' && 'Merge conflicts detected.' || 'CI failed.' }}
             Bot is working on fixing it.
@@ -437,7 +527,10 @@ jobs:
         uses: ./.github/actions/validate-merge-gate-output
         with:
           output-file: ${{ steps.output.outputs.output-file }}
-          issue-number: ${{ needs.subject.outputs.issue }}
+          # Where the agent was told to post, which on a promotion is the pull request. The
+          # validator reads the comment it finds there; pointed at an issue that never
+          # received one it would report the gate reached no verdict (FR-056).
+          issue-number: ${{ needs.subject.outputs.comment_target }}
           ci-conclusion: ${{ needs.subject.outputs.conclusion }}
   conclude:
     needs: [activation, subject, protected_changes, agent, safe_outputs, validate_output]
@@ -463,7 +556,11 @@ jobs:
         with:
           token: ${{ steps.app-token.outputs.token }}
           fetch-depth: 0
+      # A promotion closes nothing on its own: the changes it carries are already linked
+      # to their own pull requests, and FR-051 closes them when the promotion reaches the
+      # closing stage.
       - name: Verify pull request closes the source issue
+        if: needs.subject.outputs.promotion != 'true'
         continue-on-error: true
         uses: ./.github/actions/link-pr-to-issue
         with:
@@ -491,7 +588,7 @@ jobs:
           body: |
             ${{ env.GATE_MARKER }}
             **Verdict:** ${{ needs.validate_output.outputs.outcome }} (CI concluded ${{ needs.subject.outputs.conclusion }}).
-            Full assessment on the linked issue: #${{ needs.subject.outputs.issue }}. [View this workflow run](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }})
+            Full assessment: ${{ needs.subject.outputs.promotion == 'true' && 'above, on this pull request' || format('on the linked issue #{0}', needs.subject.outputs.issue) }}. [View this workflow run](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }})
       # The forge is asked before anything is attempted: a pull request it will refuse is a
       # review with a sentence, not a red run that says neither which pull request nor what
       # to do about it (FR-068).
@@ -605,21 +702,21 @@ jobs:
             gh pr comment "$PR" --repo "$REPO" --body "The merge gate approved this pull request but did not merge it: ${REFUSAL}"
           fi
       - name: Flag the refused merge for review
-        if: needs.validate_output.outputs.outcome == 'merge' && needs.subject.outputs.auto_merge == 'true' && steps.preconditions.outputs.mergeable != 'true' && (steps.preconditions.outputs.deferrable != 'true' || steps.arm.outputs.armed != 'true')
+        if: needs.subject.outputs.promotion != 'true' && (needs.validate_output.outputs.outcome == 'merge' && needs.subject.outputs.auto_merge == 'true' && steps.preconditions.outputs.mergeable != 'true' && (steps.preconditions.outputs.deferrable != 'true' || steps.arm.outputs.armed != 'true'))
         uses: ./.github/actions/add-issue-labels
         with:
           token: ${{ steps.app-token.outputs.token }}
           issue-number: ${{ needs.subject.outputs.issue }}
           labels: ${{ env.REVIEW_LABEL }}
       - name: Release remediated issue
-        if: needs.validate_output.outputs.outcome == 'remediated'
+        if: needs.subject.outputs.promotion != 'true' && (needs.validate_output.outputs.outcome == 'remediated')
         uses: ./.github/actions/remove-issue-labels
         with:
           token: ${{ steps.app-token.outputs.token }}
           issue-number: ${{ needs.subject.outputs.issue }}
           labels: ${{ env.WORKING_LABEL }}
       - name: Flag review outcome
-        if: needs.validate_output.outputs.outcome == 'review'
+        if: needs.subject.outputs.promotion != 'true' && (needs.validate_output.outputs.outcome == 'review')
         uses: ./.github/actions/add-issue-labels
         with:
           token: ${{ steps.app-token.outputs.token }}
@@ -628,7 +725,7 @@ jobs:
       # The reservation only. The pull request is still open and still waiting, so pr-pending
       # stays until the merge path below retires it.
       - name: Release review outcome
-        if: needs.validate_output.outputs.outcome == 'review'
+        if: needs.subject.outputs.promotion != 'true' && (needs.validate_output.outputs.outcome == 'review')
         uses: ./.github/actions/remove-issue-labels
         with:
           token: ${{ steps.app-token.outputs.token }}
@@ -707,7 +804,7 @@ jobs:
         uses: ./.github/actions/create-issue-comment
         with:
           token: ${{ steps.app-token.outputs.token }}
-          issue-number: ${{ needs.subject.outputs.issue }}
+          issue-number: ${{ needs.subject.outputs.comment_target }}
           body: |
             ${{ env.ATTEMPT_MARKER }}
             Attempt ${{ inputs.attempts_so_far || '0' }} of ${{ env.MAX_ATTEMPTS }} on PR #${{ needs.subject.outputs.pr }} ended without an outcome.
@@ -718,14 +815,14 @@ jobs:
         uses: ./.github/actions/create-issue-comment
         with:
           token: ${{ steps.app-token.outputs.token }}
-          issue-number: ${{ needs.subject.outputs.issue }}
+          issue-number: ${{ needs.subject.outputs.comment_target }}
           body: |
             ${{ env.ATTEMPT_MARKER }}
             Attempt ${{ inputs.attempts_so_far || '0' }} of ${{ env.MAX_ATTEMPTS }} on PR #${{ needs.subject.outputs.pr }} ended without an outcome.
             The attempt budget for this CI verdict is exhausted. The review label is set: a human must take over.
             [View this workflow run](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }})
       - name: Park the issue for a human
-        if: fromJson(inputs.attempts_so_far || '0') >= fromJson(env.PARK_AT_ATTEMPT)
+        if: needs.subject.outputs.promotion != 'true' && (fromJson(inputs.attempts_so_far || '0') >= fromJson(env.PARK_AT_ATTEMPT))
         uses: ./.github/actions/add-issue-labels
         with:
           token: ${{ steps.app-token.outputs.token }}
@@ -734,6 +831,7 @@ jobs:
       # The reservation only. A failed attempt does not close the pull request, so pr-pending
       # is still true and the board should keep saying so.
       - name: Release the issue
+        if: needs.subject.outputs.promotion != 'true'
         uses: ./.github/actions/remove-issue-labels
         with:
           token: ${{ steps.app-token.outputs.token }}
@@ -785,7 +883,11 @@ steps:
       branch=$(gh pr view "$PR" --repo "$REPO" --json headRefName --jq '.headRefName')
       git switch --track "origin/$branch" 2>/dev/null || git switch "$branch"
       echo "On $(git branch --show-current) at $(git rev-parse --short HEAD)"
+  # A promotion has no single issue whose acceptance criteria are the thing to check, so
+  # the first of several would be a context that is wrong about the rest. What it is assessed
+  # against is the diff and CI, which the next step fetches (FR-056).
   - name: Load the issue context
+    if: needs.subject.outputs.promotion != 'true'
     uses: ./.github/actions/load-issue-context
     with:
       token: ${{ github.token }}
@@ -860,9 +962,11 @@ safe-outputs:
 timeout-minutes: 60
 ---
 
-1. You are gating pull request **#${{ needs.subject.outputs.pr }}**, which closes issue
+1. You are gating pull request **#${{ needs.subject.outputs.pr }}**, which ${{ needs.subject.outputs.subject_clause }}
    **#${{ needs.subject.outputs.issue }}**. CI concluded
    **${{ needs.subject.outputs.conclusion }}**.
+
+   ${{ needs.subject.outputs.promotion_note }}
 
    It has already been confirmed that this is an open pull request we authored, that it closes
    an issue, and that the issue carries `implement`. Do not re-check any of that, and do not
@@ -883,9 +987,7 @@ timeout-minutes: 60
    `push_to_pull_request_branch` tool's own description recommends rebasing; in this
    repository that advice is wrong. Merge, commit, and let the workflow push.
 
-2. Read `${{ env.ISSUE_CONTEXT_PATH }}`. It contains the issue body and its discussion. When
-   running `/${{ env.REPO_VERIFY_COMMAND }}`, the acceptance criteria there define what the implementation must
-   satisfy.
+2. ${{ needs.subject.outputs.context_instruction }}
 
 3. Branch on the conclusion.
 
@@ -1063,7 +1165,7 @@ timeout-minutes: 60
    whose protection requires a human is not a branch to argue with: the gate does not ask for
    an exception and neither do you.
 
-8. Emit exactly one `add_comment` targeting issue `${{ needs.subject.outputs.issue }}` with:
+8. Emit exactly one `add_comment` targeting `${{ needs.subject.outputs.comment_target }}` with:
    1. `${{ env.GATE_MARKER }}`
    2. A heading: `## Merge gate decision for PR #${{ needs.subject.outputs.pr }}`
    3. A structured assessment table with all 10 check results

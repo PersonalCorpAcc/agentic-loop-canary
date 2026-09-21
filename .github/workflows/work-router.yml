@@ -1,4 +1,4 @@
-# Managed by @plainconceptsplatform/workflows@0.5.1. Source: loops/workflows/work-router.yml. Profile digest: a586f6e065d0. Update with `workflows update --force`; consumer edits may be overwritten.
+# Managed by @plainconceptsplatform/workflows@0.5.1. Source: loops/workflows/work-router.yml. Profile digest: 17b8a563c65f. Update with `workflows update --force`; consumer edits may be overwritten.
 name: "All Work Router"
 
 # Owns every repository automation trigger. Classifies each event into exactly one route,
@@ -899,9 +899,27 @@ jobs:
           # shellcheck source=../actions/resolve-pr-issue/resolve-pr-issue.sh
           . "$GITHUB_WORKSPACE/.github/actions/resolve-pr-issue/resolve-pr-issue.sh"
 
+          # Every issue this pull request carries, not just the first. Under `env-promotion`
+          # the head is a snapshot of the stage below, so one promotion carries whatever
+          # merged there since the last one and every one of those issues reached this stage
+          # when it merged. Labelling only the first would leave the rest sitting on a stage
+          # they had left, and would never close them (FR-031, FR-051).
+          #
+          # Every other strategy carries exactly one, so `issues` is that one and the scalar
+          # `issue` below is the same value: the readers that want a single number -- the
+          # outcome line, the comment text -- keep reading one.
+          issues="$(pr_issues "$PR")"
+          [ -n "$issues" ] || issues="$LINKED"
+          {
+            echo "issues<<EOF_ISSUES"
+            printf '%s\n' "$issues"
+            echo "EOF_ISSUES"
+          } >> "$GITHUB_OUTPUT"
+
           issue="$LINKED"
-          [ -n "$issue" ] || issue="$(pr_issue "$PR")"
+          [ -n "$issue" ] || issue="$(printf '%s' "$issues" | head -n1)"
           echo "issue=${issue}" >> "$GITHUB_OUTPUT"
+          echo "issue_count=$(printf '%s\n' "$issues" | grep -c '[0-9]' || true)" >> "$GITHUB_OUTPUT"
 
           # A promotion pull request carries the stage it was promoting into, which is what
           # tells an unmerged close apart: a promotion that was rejected is a hold on the
@@ -926,14 +944,14 @@ jobs:
         uses: ./.github/actions/add-issue-labels
         with:
           token: ${{ github.token }}
-          issue-number: ${{ steps.change.outputs.issue }}
+          issue-number: ${{ steps.change.outputs.issues }}
           labels: ${{ steps.change.outputs.stage_label }}
       - name: Clear the in-flight labels
         if: steps.change.outputs.issue != '' && needs.classify.outputs.pr-merged == 'true'
         uses: ./.github/actions/remove-issue-labels
         with:
           token: ${{ github.token }}
-          issue-number: ${{ steps.change.outputs.issue }}
+          issue-number: ${{ steps.change.outputs.issues }}
           labels: |
             ${{ env.IMPLEMENT_LABEL }}
             ${{ env.WORKING_LABEL }}
@@ -946,7 +964,7 @@ jobs:
         uses: ./.github/actions/remove-issue-labels
         with:
           token: ${{ github.token }}
-          issue-number: ${{ steps.change.outputs.issue }}
+          issue-number: ${{ steps.change.outputs.issues }}
           labels: |
             ${{ env.PR_PENDING_LABEL }}
             ${{ env.WORKING_LABEL }}
@@ -958,7 +976,7 @@ jobs:
         uses: ./.github/actions/add-issue-labels
         with:
           token: ${{ github.token }}
-          issue-number: ${{ steps.change.outputs.issue }}
+          issue-number: ${{ steps.change.outputs.issues }}
           labels: ${{ env.HOLD_LABEL }}
       # The merge that just happened is the thing that breaks ancestry: promotion replays a
       # change onto the stage above, so the moment it lands there, that stage holds commits
@@ -1008,7 +1026,7 @@ jobs:
         uses: ./.github/actions/create-issue-comment
         with:
           token: ${{ github.token }}
-          issue-number: ${{ steps.change.outputs.issue }}
+          issue-number: ${{ steps.change.outputs.issues }}
           body: |
             The promotion pull request #${{ needs.classify.outputs.pr-number }} into
             `${{ needs.classify.outputs.pr-base }}` was closed without merging, so this change
@@ -1019,11 +1037,21 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
           REPO: ${{ github.repository }}
-          ISSUE: ${{ steps.change.outputs.issue }}
+          ISSUES: ${{ steps.change.outputs.issues }}
         run: |
           set -euo pipefail
-          gh issue close "$ISSUE" --repo "$REPO" --reason completed
-          echo "Issue #${ISSUE} closed: its change reached the stage this repository ends on."
+          # Every carried issue, because under `env-promotion` the merge that reaches the
+          # closing stage reaches it for all of them at once. One `gh` call each, and a close
+          # that fails does not take the rest with it: the issues are independent and a
+          # half-closed set with an error is better than a set nobody closed.
+          while IFS= read -r issue; do
+            [ -n "$issue" ] || continue
+            if gh issue close "$issue" --repo "$REPO" --reason completed; then
+              echo "Issue #${issue} closed: its change reached the stage this repository ends on."
+            else
+              echo "::warning::Issue #${issue} reached the closing stage but could not be closed."
+            fi
+          done <<< "$ISSUES"
       - name: Record the outcome
         if: always()
         uses: ./.github/actions/record-outcome
@@ -1032,7 +1060,149 @@ jobs:
           reason: ${{ steps.change.outputs.issue == '' && 'no-linked-issue' || needs.classify.outputs.pr-merged == 'true' && 'merged' || steps.change.outputs.promotion == 'true' && 'hold' || 'labelled' }}
           route: stage-merge
           subject: ${{ format('#{0}', needs.classify.outputs.pr-number) }}
-          detail: "${{ steps.change.outputs.issue == '' && 'The pull request closed on a stage but belongs to no issue this loop knows.' || needs.classify.outputs.pr-merged == 'true' && format('Issue #{0} reached {1}.', steps.change.outputs.issue, needs.classify.outputs.pr-base) || format('Pull request closed without merging; issue #{0} released.', steps.change.outputs.issue) }}"
+          # The count is in the line because a promotion under env-promotion carries several
+          # issues and an outcome naming one of them reads as though the others were missed.
+          detail: "${{ steps.change.outputs.issue == '' && 'The pull request closed on a stage but belongs to no issue this loop knows.' || needs.classify.outputs.pr-merged == 'true' && format('Issue #{0} reached {1} ({2} issue(s) carried).', steps.change.outputs.issue, needs.classify.outputs.pr-base, steps.change.outputs.issue_count) || format('Pull request closed without merging; issue #{0} released.', steps.change.outputs.issue) }}"
+
+  # A hotfix goes to the release branch first, because that is what is in production, and
+  # then back to the trunk -- in that order, or the next release cuts a branch without it and
+  # the fix is lost at the next cut. Nobody remembers to do this by hand at the moment they
+  # are shipping a hotfix, which is why it is the route's job (FR-055).
+  #
+  # Its own job with the App token: a pull request opened with the plain workflow token
+  # starts no checks, and a cherry-pick-back that arrives with no CI is a change nobody
+  # assessed landing on the trunk. stage-merge keeps the plain token for its label work,
+  # which is what its own event grants and all it needs.
+  hotfix-back:
+    needs: classify
+    if: needs.classify.outputs.route == 'stage-merge' && needs.classify.outputs.pr-merged == 'true'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    permissions:
+      contents: write
+      pull-requests: write
+      issues: read
+    env:
+      HOTFIX_LABEL: "hotfix"
+      TRUNK: "main"
+    steps:
+      - name: Decide whether this merge is a hotfix on a release branch
+        id: decide
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          BASE_REF: ${{ needs.classify.outputs.pr-base }}
+          PR: ${{ needs.classify.outputs.pr-number }}
+          LINKED: ${{ needs.classify.outputs.linked-issue }}
+        run: |
+          set -euo pipefail
+          echo "carry=false" >> "$GITHUB_OUTPUT"
+
+          # A repository that cuts no release branches has no pattern at all: the optional
+          # token takes its own line with it, so this is read defensively.
+          if [ -z "${RELEASE_PATTERN:-}" ]; then
+            echo "This repository cuts no release branches; nothing to carry back."
+            exit 0
+          fi
+          if ! printf '%s' "$BASE_REF" | grep -qE "${RELEASE_PATTERN}"; then
+            echo "${BASE_REF} is not a release branch; the trunk is where this change already is."
+            exit 0
+          fi
+
+          # shellcheck source=../actions/resolve-pr-issue/resolve-pr-issue.sh
+          . "$GITHUB_WORKSPACE/.github/actions/resolve-pr-issue/resolve-pr-issue.sh"
+          issue="$LINKED"
+          [ -n "$issue" ] || issue="$(pr_issue "$PR")"
+          if [ -z "$issue" ]; then
+            echo "::notice::PR #${PR} merged into ${BASE_REF} but belongs to no issue this loop knows; nothing to carry back."
+            exit 0
+          fi
+
+          # Without the label this is ordinary work on a release branch, and FR-055 says the
+          # route only records which branch it reached -- which stage-merge has already done.
+          if ! gh issue view "$issue" --repo "$REPO" --json labels --jq '[.labels[].name]' |
+            jq -e --arg name "$HOTFIX_LABEL" 'index($name)' >/dev/null 2>&1; then
+            echo "Issue #${issue} does not carry ${HOTFIX_LABEL}; ${BASE_REF} is where this change belongs."
+            exit 0
+          fi
+
+          {
+            echo "carry=true"
+            echo "issue=${issue}"
+          } >> "$GITHUB_OUTPUT"
+          echo "Issue #${issue} is a hotfix on ${BASE_REF}; carrying it back to ${TRUNK}."
+      - name: Generate App token for the carry-back
+        if: steps.decide.outputs.carry == 'true'
+        id: app-token
+        uses: actions/create-github-app-token@df432ceedc7162793a195dd1713ff69aefc7379e # v2.0.6
+        with:
+          app-id: ${{ secrets.BOT_APP_ID }}
+          private-key: ${{ secrets.BOT_PRIVATE_KEY }}
+      - name: Checkout
+        if: steps.decide.outputs.carry == 'true'
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          token: ${{ steps.app-token.outputs.token }}
+      - name: Open the carry-back pull request
+        if: steps.decide.outputs.carry == 'true'
+        id: carry
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+          REPO: ${{ github.repository }}
+          PR: ${{ needs.classify.outputs.pr-number }}
+          BASE_REF: ${{ needs.classify.outputs.pr-base }}
+          ISSUE: ${{ steps.decide.outputs.issue }}
+          GIT_IDENTITY: "github-actions[bot]"
+          TITLE_PREFIX: "[bot] "
+        run: |
+          set -euo pipefail
+          git config user.name "$GIT_IDENTITY"
+          git config user.email "${GIT_IDENTITY}@users.noreply.github.com"
+
+          merged="$(gh api "repos/$REPO/pulls/$PR" --jq '.merge_commit_sha // empty')"
+          [ -n "$merged" ] || { echo "::warning::PR #${PR} reports no merge commit; nothing to carry back."; exit 0; }
+          # Fetched before it is named: a checkout brings down what the run needs and nothing
+          # else, and handing an unfetched sha to git exits 128.
+          git fetch --no-tags --quiet origin "$merged" "$TRUNK" || true
+
+          if git merge-base --is-ancestor "$merged" "origin/${TRUNK}" 2>/dev/null; then
+            echo "${TRUNK} already has ${merged:0:8}; nothing to carry back."
+            exit 0
+          fi
+
+          branch="hotfix-back/${ISSUE}-${GITHUB_RUN_ID}"
+          git switch --detach "origin/${TRUNK}"
+          git switch -c "$branch"
+          if ! git cherry-pick -m 1 "$merged" >/dev/null 2>&1 && ! git cherry-pick "$merged" >/dev/null 2>&1; then
+            files="$(git diff --name-only --diff-filter=U 2>/dev/null | head -n 20 | tr '\n' ' ')"
+            git cherry-pick --abort >/dev/null 2>&1 || true
+            echo "::warning::The hotfix on ${BASE_REF} does not apply cleanly onto ${TRUNK} (${files:-files not recorded}); nothing was pushed and it needs a person."
+            exit 0
+          fi
+
+          git push origin "HEAD:refs/heads/${branch}"
+          # The same issue marker the original carried, so every reader that asks which issue
+          # a pull request belongs to gets the same answer for both halves of the hotfix.
+          # Built with printf rather than written inline: a body line starting at column
+          # zero ends the YAML literal block this step is written in, and the router then
+          # fails to parse at install time rather than here.
+          body="$(printf '%s\n\n%s\n' \
+            "Carries the hotfix that landed on \`${BASE_REF}\` in #${PR} back to \`${TRUNK}\`, so the next release branch is cut with it." \
+            "<!-- implement-issue: ${ISSUE} -->")"
+          gh pr create --repo "$REPO" --base "$TRUNK" --head "$branch" \
+            --title "${TITLE_PREFIX}carry hotfix #${ISSUE} back to ${TRUNK}" \
+            --body "$body"
+          echo "carried=true" >> "$GITHUB_OUTPUT"
+      - name: Record the outcome
+        if: always() && steps.decide.outputs.carry == 'true'
+        uses: ./.github/actions/record-outcome
+        with:
+          outcome: ${{ steps.carry.outputs.carried == 'true' && 'acted' || 'handed-to-human' }}
+          reason: ${{ steps.carry.outputs.carried == 'true' && 'acted' || 'conflict-handed-off' }}
+          route: stage-merge
+          subject: ${{ format('#{0}', steps.decide.outputs.issue) }}
+          detail: "${{ steps.carry.outputs.carried == 'true' && format('The hotfix on {0} is on its way back to {1}.', needs.classify.outputs.pr-base, 'the trunk') || 'The hotfix does not apply cleanly onto the trunk; nothing was pushed.' }}"
 
   detect-pr-conflicts:
     needs: classify
@@ -1196,14 +1366,19 @@ jobs:
             # failed attempts (the attempt marker) deliberately do not count.
             verdict=$(gh api "repos/$REPO/issues/$pr/comments?per_page=100" \
               --jq '[.[] | select((.body | contains("<!-- agent-merge-gate -->")) and (.body | contains("**Verdict:**"))) | .created_at] | max // empty')
-            linked_issue="$(pr_issue "$pr")"
-            if [ -n "$linked_issue" ]; then
+            # Every issue this pull request carries, not the first of them. A promotion under
+            # `env-promotion` carries the set that merged into the stage below, so a budget
+            # counted against one of them is a fraction of the budget the gate is meant to have,
+            # and a verdict recorded on another of them would not be seen at all (FR-056).
+            carried_issues="$(pr_issues "$pr")"
+            while IFS= read -r linked_issue; do
+              [ -n "$linked_issue" ] || continue
               issue_verdict=$(gh api "repos/$REPO/issues/$linked_issue/comments?per_page=100" \
                 --jq '[.[] | select((.body | contains("<!-- agent-merge-gate -->")) and (.body | contains("**Verdict:**"))) | .created_at] | max // empty')
               if [ -n "$issue_verdict" ] && { [ -z "$verdict" ] || [ "$issue_verdict" \> "$verdict" ]; }; then
                 verdict="$issue_verdict"
               fi
-            fi
+            done <<< "$carried_issues"
             if [ -n "$verdict" ] && [ "$verdict" \> "$ci_finished" ]; then
               echo "PR #$pr already has a gate verdict newer than CI; skipping."
               return 0
@@ -1211,11 +1386,12 @@ jobs:
 
             attempts=$(gh api "repos/$REPO/issues/$pr/comments?per_page=100" \
               --jq '[.[] | select(.body | contains("<!-- agent-merge-gate-attempt -->")) | select(.created_at > "'"$ci_finished"'") ] | length')
-            if [ -n "$linked_issue" ]; then
+            while IFS= read -r linked_issue; do
+              [ -n "$linked_issue" ] || continue
               issue_attempts=$(gh api "repos/$REPO/issues/$linked_issue/comments?per_page=100" \
                 --jq '[.[] | select(.body | contains("<!-- agent-merge-gate-attempt -->")) | select(.created_at > "'"$ci_finished"'") ] | length')
               attempts=$((attempts + issue_attempts))
-            fi
+            done <<< "$carried_issues"
             if [ "$attempts" -ge 6 ]; then
               echo "PR #$pr already consumed $attempts gate attempts on this CI verdict, parking for review."
               return 0
@@ -1489,14 +1665,19 @@ jobs:
               # Attempts are failed gates (the attempt marker) since this CI verdict.
               latest_verdict=$(gh api "repos/$REPO/issues/$pr_number/comments?per_page=100" \
                 --jq '[.[] | select((.body | contains("<!-- agent-merge-gate -->")) and (.body | contains("**Verdict:**"))) | .created_at] | max // empty')
-              linked_issue="$(pr_issue "$pr_number")"
-              if [ -n "$linked_issue" ]; then
+              # Every issue this pull request carries, not the first of them. A promotion under
+              # `env-promotion` carries the set that merged into the stage below, so a budget
+              # counted against one of them is a fraction of the budget the gate is meant to have,
+              # and a verdict recorded on another of them would not be seen at all (FR-056).
+              carried_issues="$(pr_issues "$pr_number")"
+              while IFS= read -r linked_issue; do
+                [ -n "$linked_issue" ] || continue
                 issue_verdict=$(gh api "repos/$REPO/issues/$linked_issue/comments?per_page=100" \
                   --jq '[.[] | select((.body | contains("<!-- agent-merge-gate -->")) and (.body | contains("**Verdict:**"))) | .created_at] | max // empty')
                 if [ -n "$issue_verdict" ] && { [ -z "$latest_verdict" ] || [ "$issue_verdict" \> "$latest_verdict" ]; }; then
                   latest_verdict="$issue_verdict"
                 fi
-              fi
+              done <<< "$carried_issues"
               if [ -n "$latest_verdict" ] && [ "$latest_verdict" \> "$ci_finished" ]; then
                 echo "Merge gate verdict ($latest_verdict) is newer than CI ($ci_finished) for PR #$pr_number, skipping"
                 continue
@@ -1504,11 +1685,12 @@ jobs:
 
               attempts=$(gh api "repos/$REPO/issues/$pr_number/comments?per_page=100" \
                 --jq '[.[] | select(.body | contains("<!-- agent-merge-gate-attempt -->")) | select(.created_at > "'"$ci_finished"'") ] | length')
-              if [ -n "$linked_issue" ]; then
+              while IFS= read -r linked_issue; do
+                [ -n "$linked_issue" ] || continue
                 issue_attempts=$(gh api "repos/$REPO/issues/$linked_issue/comments?per_page=100" \
                   --jq '[.[] | select(.body | contains("<!-- agent-merge-gate-attempt -->")) | select(.created_at > "'"$ci_finished"'") ] | length')
                 attempts=$((attempts + issue_attempts))
-              fi
+              done <<< "$carried_issues"
               if [ "$attempts" -ge 6 ]; then
                 echo "PR #$pr_number already consumed $attempts gate attempts on this CI verdict, parking for review"
                 continue

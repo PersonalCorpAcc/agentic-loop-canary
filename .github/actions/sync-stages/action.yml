@@ -1,4 +1,4 @@
-# Managed by @plainconceptsplatform/workflows@0.5.1. Source: loops/actions/sync-stages/action.yml. Profile digest: a586f6e065d0. Update with workflows update --force; consumer edits may be overwritten.
+# Managed by @plainconceptsplatform/workflows@0.5.1. Source: loops/actions/sync-stages/action.yml. Profile digest: 17b8a563c65f. Update with workflows update --force; consumer edits may be overwritten.
 name: Sync stages
 description: >
   Carry content that arrived on a later stage back down the chain, as a pull request per
@@ -19,7 +19,7 @@ inputs:
   branch-strategy:
     description: The branching strategy, because env-promotion's later stages are snapshots rather than histories of their own.
     required: false
-    default: 'branch-chain'
+    default: 'env-promotion'
   release-pattern:
     description: Extended regular expression matching release branches, so the guard refuses them as synchronisation heads.
     required: false

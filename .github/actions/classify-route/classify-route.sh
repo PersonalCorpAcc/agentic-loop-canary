@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Managed by @plainconceptsplatform/workflows@0.5.1. Source: loops/actions/classify-route/classify-route.sh. Profile digest: a586f6e065d0. Update with `workflows update --force`; consumer edits may be overwritten.
+# Managed by @plainconceptsplatform/workflows@0.5.1. Source: loops/actions/classify-route/classify-route.sh. Profile digest: 17b8a563c65f. Update with `workflows update --force`; consumer edits may be overwritten.
 # Classify one GitHub event into exactly one route. Pure: no network, no gh calls, so
 # verify-route-matrix.sh can source this file and exercise the same code the router runs.
 #
@@ -27,7 +27,7 @@ fi
 # to exercise the real classifier rather than restating it, so shellcheck cannot see their
 # use from here.
 # shellcheck disable=SC2034
-readonly BRANCH_STRATEGY="branch-chain"
+readonly BRANCH_STRATEGY="env-promotion"
 # The stages a change is promoted through, in order. One entry under a strategy with no
 # chain: the branch every change is cut from and merged back into.
 readonly STAGE_BRANCHES=("dev" "test" "main")
@@ -317,6 +317,11 @@ classify_route() {
           # the router -- projection removes lines, not jobs -- so this is what makes it
           # unreachable, and it says why rather than running a route that would find
           # nothing every time (FR-031).
+          #
+          # Keyed on the strategy rather than on the stage count, unlike sync-stages below:
+          # `release-branch` also has one stage and still reaches this route, because what
+          # it promotes is not a change between stages but the release branch itself, cut
+          # from the trunk on the cadence (FR-055).
           if [ "${BRANCH_STRATEGY}" = "trunk" ]; then
             error="this repository merges into one branch, so there is nowhere to promote to"
           else
@@ -326,7 +331,13 @@ classify_route() {
         sync-stages)
           # The same fact from the other end: one branch cannot fall behind another, so
           # there is nothing to carry back down (FR-079).
-          if [ "${BRANCH_STRATEGY}" = "trunk" ]; then
+          #
+          # Two strategies answer here rather than one. `release-branch` also has a single
+          # stage, and its release branches are *meant* to diverge from the trunk: carrying
+          # the trunk back down onto them would undo every release they were cut to hold
+          # (FR-055). So the test is the number of stages, which is the fact the rule is
+          # actually about, rather than the name of one strategy that happens to have one.
+          if [ "${#STAGE_BRANCHES[@]}" -lt 2 ]; then
             error="this repository merges into one branch, so no stage can fall behind another"
           else
             route="sync-stages"
