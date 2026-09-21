@@ -1,4 +1,4 @@
-# Managed by @plainconceptsplatform/workflows@0.5.1. Source: loops/actions/identify-gate-subject/action.yml. Profile digest: edd833fb9ae5. Update with workflows update --force; consumer edits may be overwritten.
+# Managed by @plainconceptsplatform/workflows@0.5.1. Source: loops/actions/identify-gate-subject/action.yml. Profile digest: cd84a4273d7e. Update with workflows update --force; consumer edits may be overwritten.
 name: Identify gate subject
 description: Confirm the pull request is one we authored, resolve the issue it closes, and check that issue carries the required label.
 inputs:
@@ -8,6 +8,14 @@ inputs:
   pr-number:
     description: Pull request number to gate.
     required: true
+  ci-run-id:
+    description: >
+      The CI run the caller already knows about, when it knows one. A dispatch from the CI
+      template or from the reconcile belt carries it, and without it the failing logs cannot
+      be fetched: the derivation below only runs when the conclusion is missing, which is
+      never the case for those callers (T247).
+    required: false
+    default: ""
   ci-conclusion:
     description: Conclusion reported by the CI run that triggered this gate. If empty, fetches from the PR's latest CI run.
     required: false
@@ -69,6 +77,7 @@ runs:
         REPO: ${{ github.repository }}
         PR_NUMBER: ${{ inputs.pr-number }}
         CONCLUSION: ${{ inputs.ci-conclusion }}
+        RUN_ID_INPUT: ${{ inputs.ci-run-id }}
         LINKED_ISSUE: ${{ inputs.linked-issue }}
         REQUIRE_LABEL: ${{ inputs.require-label }}
         STAGE_LABELS: ${{ inputs.stage-labels }}
@@ -138,10 +147,12 @@ runs:
           fi
         fi
 
-        # Fetch CI conclusion if not provided (label-triggered runs)
+        # Fetch CI conclusion if not provided (label-triggered runs), and the run id
+        # whenever the caller did not supply one -- a conclusion with no run id is what the
+        # belt and the CI template send, and it left the agent with no logs at all (T247).
         ci_conclusion="$CONCLUSION"
-        ci_run_id=""
-        if [ -z "$ci_conclusion" ]; then
+        ci_run_id="${RUN_ID_INPUT:-}"
+        if [ -z "$ci_conclusion" ] || [ -z "$ci_run_id" ]; then
           head_sha="$(gh pr view "$PR_NUMBER" --repo "$REPO" --json headRefOid --jq '.headRefOid')"
           # Branch protection requires a check run by name, and a check run's name is a job's,
           # not a workflow's. Reading the same check here is what makes "CI passed" mean one
@@ -151,8 +162,9 @@ runs:
             --jq '[.check_runs[] | select(.name == "CI")] | sort_by(.started_at) | last')"
           
           if [ -n "$ci_run" ] && [ "$ci_run" != "null" ]; then
-            ci_conclusion="$(jq -r '.conclusion // "pending"' <<<"$ci_run")"
-            ci_run_id="$(jq -r '.html_url' <<<"$ci_run" | sed -n 's#.*/actions/runs/\([0-9][0-9]*\)/.*#\1#p')"
+            # A conclusion the caller gave is the caller's; only fill in what is missing.
+            [ -n "$ci_conclusion" ] || ci_conclusion="$(jq -r '.conclusion // "pending"' <<<"$ci_run")"
+            [ -n "$ci_run_id" ] || ci_run_id="$(jq -r '.html_url' <<<"$ci_run" | sed -n 's#.*/actions/runs/\([0-9][0-9]*\)/.*#\1#p')"
             echo "::notice::Fetched CI status: $ci_conclusion (run $ci_run_id)"
           else
             ci_conclusion="unknown"

@@ -1,5 +1,5 @@
 ---
-# Managed by @plainconceptsplatform/workflows@0.5.1. Source: loops/workflows/shared/platform-defaults.md. Profile digest: edd833fb9ae5. Update with `workflows update --force`; consumer edits may be overwritten.
+# Managed by @plainconceptsplatform/workflows@0.5.1. Source: loops/workflows/shared/platform-defaults.md. Profile digest: cd84a4273d7e. Update with `workflows update --force`; consumer edits may be overwritten.
 description: Shared network and safe-output defaults for catalog agent workflows.
 
 network:
