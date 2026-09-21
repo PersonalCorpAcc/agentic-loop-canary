@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Managed by @plainconceptsplatform/workflows@0.5.1. Source: loops/actions/promote-change/promote-change.sh. Profile digest: a586f6e065d0. Update with `workflows update --force`; consumer edits may be overwritten.
+# Managed by @plainconceptsplatform/workflows@0.5.1. Source: loops/actions/promote-change/promote-change.sh. Profile digest: 17b8a563c65f. Update with `workflows update --force`; consumer edits may be overwritten.
 #
 # Move the changes that are ready one stage along the chain (FR-031).
 #
@@ -26,6 +26,18 @@ reason="no-eligible-change"
 
 note() { echo "$*"; }
 
+# The one place this route says what it did. Two paths reach it -- the cherry-picking one
+# below and the snapshot one of env-promotion -- and a second copy of these three lines is
+# how the two strategies would come to report their outcomes differently.
+report_and_exit() {
+  {
+    echo "promoted=${promoted}"
+    echo "reason=${reason}"
+  } >>"${GITHUB_OUTPUT:-/dev/stdout}"
+  note "Promotions opened: ${promoted}."
+  exit 0
+}
+
 # One run looks at every pair in the chain and every merged change on each, so it collects
 # several answers and reports one (FR-058).
 #
@@ -48,13 +60,63 @@ skipped_because() {
 # `dev,test,main` as an array, in chain order: promotion is always from one entry to the
 # next, so the pairs are what this file actually works in.
 IFS=',' read -r -a stages <<<"$STAGE_BRANCHES"
+# release-branch has no chain and promotes nothing between stages. What this route does for
+# it is cut the next release branch from the trunk on the profile's cadence (FR-055).
+#
+# The version is the period the cadence names, because that is the only identifier available
+# to a deterministic job: nothing here may read a package manifest, which would be a stack
+# assumption, and nothing may ask an agent. A repository that wants semantic versions cuts
+# its branches by hand and this route leaves them alone -- it only ever creates the branch
+# for the current period, and only when that branch does not exist.
+cut_release_branch() {
+  local version name trunk="${stages[0]}"
+
+  if [ -z "${RELEASE_TEMPLATE:-}" ]; then
+    note "This repository states no release branch template, so there is nothing to cut."
+    return 0
+  fi
+
+  case "${CADENCE:-}" in
+    daily) version="$(date -u +%Y.%m.%d)" ;;
+    weekly) version="$(date -u +%Y-W%V)" ;;
+    monthly) version="$(date -u +%Y.%m)" ;;
+    quarterly) version="$(date -u +%Y).Q$(( ($(date -u +%-m) + 2) / 3 ))" ;;
+    *)
+      note "::warning::'${CADENCE:-}' is not a cadence this route can turn into a period, so it cannot name a release branch. Nothing cut."
+      return 0
+      ;;
+  esac
+
+  name="${RELEASE_TEMPLATE//"{version}"/"$version"}"
+
+  if git ls-remote --exit-code --heads origin "$name" >/dev/null 2>&1; then
+    note "${name} already exists; this period's release branch has been cut."
+    skipped_because "already-present"
+    return 0
+  fi
+
+  git fetch --no-tags origin "${trunk}:refs/remotes/origin/${trunk}" >/dev/null 2>&1 || true
+  if ! git rev-parse --verify --quiet "refs/remotes/origin/${trunk}" >/dev/null; then
+    note "::warning::The trunk '${trunk}' is not readable in this checkout; nothing cut."
+    return 0
+  fi
+
+  # No lease and no force: the branch is new, and one that already existed was answered
+  # above. A release branch this route overwrote would be a released history rewritten.
+  git push origin "refs/remotes/origin/${trunk}:refs/heads/${name}"
+  note "Cut ${name} from ${trunk}."
+  promoted=$((promoted + 1))
+  reason="promoted"
+}
+
+if [ "${BRANCH_STRATEGY:-}" = "release-branch" ]; then
+  cut_release_branch
+  report_and_exit
+fi
+
 if [ "${#stages[@]}" -lt 2 ]; then
   note "This repository has one stage, so there is nowhere to promote to."
-  {
-    echo "promoted=0"
-    echo "reason=no-eligible-change"
-  } >>"${GITHUB_OUTPUT:-/dev/stdout}"
-  exit 0
+  report_and_exit
 fi
 
 # The soak a stage demands, from `stage=duration` pairs. An absent entry is no soak.
@@ -185,16 +247,297 @@ has_label() {
     jq -e --arg name "$name" 'index($name)' >/dev/null 2>&1
 }
 
-# env-promotion reconstructs nothing: its head is a snapshot of the previous stage branch,
-# so there is no cherry-picking to do and T169 builds that path. Anything else that reaches
-# this file promotes by carrying commits across.
+# Every issue a set of commits belongs to, one per line, each once and in the order the
+# commits were made. The forge's commit-to-pull-requests lookup is what makes this work for
+# all three merge methods at once: a squashed change, a rebased one and a merge commit all
+# answer with the pull request they came from, which is the one question that survives the
+# forge rewriting history (FR-031).
+issues_behind() {
+  local sha pr seen_prs="" seen_issues="" issue
+  for sha in "$@"; do
+    while IFS= read -r pr; do
+      [ -n "$pr" ] || continue
+      case " ${seen_prs} " in *" ${pr} "*) continue ;; esac
+      seen_prs="${seen_prs} ${pr}"
+      issue="$(pr_issue "$pr")"
+      [ -n "$issue" ] || continue
+      case " ${seen_issues} " in *" ${issue} "*) continue ;; esac
+      seen_issues="${seen_issues} ${issue}"
+      printf '%s\n' "$issue"
+    done < <(gh api "repos/${REPO}/commits/${sha}/pulls" --jq '.[].number' 2>/dev/null || true)
+  done
+}
+
+# env-promotion, which reconstructs nothing (FR-031).
+#
+# The head is a snapshot: a new branch created at one commit of the stage below, with no
+# cherry-pick and no force-push. It is a snapshot rather than the stage branch itself because
+# the stage branch keeps moving -- a pull request opened from `dev` carries every merge that
+# lands on `dev` afterwards, with no soak measured and no hold consulted, and the promotion
+# a person reviewed on Tuesday is not the one that merges on Wednesday.
+#
+# Eligibility is per stage rather than per change, which is the whole difference from the
+# cherry-picking path below. A snapshot carries everything under it, so there is no way to
+# take one change and leave its neighbour: the newest merge that has soaked fixes the commit,
+# and a hold, rollback or hotfix signal on *any* change under that commit stops the stage.
+# The alternative -- promoting around a held change -- is not available, because the commit
+# containing it is an ancestor of every commit after it.
+promote_by_snapshot() {
+  local index previous next soak_seconds eligible_sha eligible_pr merged_epoch age
+  local pr merged_at oid had_merge snapshot_branch short carried blocked issue entry
+  local -a commits issues
+
+  for index in "${!stages[@]}"; do
+    [ "$index" -gt 0 ] || continue
+    previous="${stages[index - 1]}"
+    next="${stages[index]}"
+
+    note "── ${previous} → ${next} ─────────────────────────────────────────"
+
+    # One promotion per target at a time (FR-031). The same rule and the same marker as the
+    # cherry-picking path: two snapshots of the same stage open at once would each carry the
+    # other's contents, and whichever merged second would carry a change the first never saw.
+    open_promotion="$(gh pr list --repo "$REPO" --state open --base "$next" --json number,body \
+      --jq "[.[] | select((.body // \"\") | contains(\"<!-- promotion-pr: ${next}: \"))][0].number // empty")"
+    if [ -n "$open_promotion" ]; then
+      note "Promotion pull request #${open_promotion} into ${next} is still open; nothing else goes to ${next} until it lands."
+      skipped_because "already-present"
+      continue
+    fi
+
+    git fetch --no-tags origin "${previous}:refs/remotes/origin/${previous}" "${next}:refs/remotes/origin/${next}" >/dev/null 2>&1 || true
+
+    soak_seconds="$(duration_seconds "$(soak_for "$next")")"
+
+    # The newest merge into the stage below that has rested long enough, and the commit it
+    # produced. Newest first and the first soaked one wins: an older commit would leave the
+    # merges above it behind for no reason, and a newer one has not soaked.
+    #
+    # Deliberately not filtered to the bot's own pull requests, unlike the cherry-picking
+    # path. A snapshot is a picture of the branch, so a person's merge into `dev` is in it
+    # whether or not this route was told about it; pretending otherwise would promote work
+    # while reporting that it had not.
+    eligible_sha=""
+    eligible_pr=""
+    had_merge=0
+    while IFS=$'\t' read -r pr merged_at oid; do
+      [ -n "$oid" ] || continue
+      had_merge=1
+      merged_epoch="$(date -u -d "$merged_at" +%s 2>/dev/null || echo 0)"
+      age=$(( $(date -u +%s) - merged_epoch ))
+      if [ "$merged_epoch" -gt 0 ] && [ "$age" -lt "$soak_seconds" ]; then
+        note "PR #${pr} merged into ${previous} $((age / 60))m ago, and ${next} asks for $((soak_seconds / 60))m."
+        continue
+      fi
+      eligible_sha="$oid"
+      eligible_pr="$pr"
+      break
+    done < <(gh pr list --repo "$REPO" --state merged --base "$previous" --limit 50 \
+      --json number,mergedAt,mergeCommit \
+      --jq 'sort_by(.mergedAt) | reverse | .[] | [.number, .mergedAt, (.mergeCommit.oid // "")] | @tsv')
+
+    if [ -z "$eligible_sha" ]; then
+      if [ "$had_merge" -eq 1 ]; then
+        note "Nothing on ${previous} has rested long enough for ${next}."
+        skipped_because "soak-pending"
+      else
+        note "Nothing has merged into ${previous}; there is nothing to snapshot."
+        skipped_because "no-eligible-change"
+      fi
+      continue
+    fi
+
+    # Fetched before it is named: a checkout brings down what the run needs and nothing
+    # else, and handing an unfetched sha to git exits 128 and takes the route with it. The
+    # same failure that killed promotion under squash the first time a repository used it.
+    git fetch --no-tags --quiet origin "$eligible_sha" 2>/dev/null || true
+    if ! git cat-file -e "${eligible_sha}^{commit}" 2>/dev/null; then
+      note "::warning::${eligible_sha:0:8} is not readable in this checkout; leaving ${next} alone."
+      skipped_because "no-eligible-change"
+      continue
+    fi
+
+    # The cheap answer first: the stage above literally has this commit, which is what a
+    # merge-method promotion leaves behind. It is only ever a fast path -- under `rebase` and
+    # `squash` the forge mints new identifiers for the same content, so the commits this
+    # promotion carried are on `${next}` and are ancestors of nothing here (FR-032).
+    if git merge-base --is-ancestor "$eligible_sha" "refs/remotes/origin/${next}" 2>/dev/null; then
+      note "${next} already contains ${eligible_sha:0:8}; there is nothing to carry."
+      skipped_because "already-present"
+      continue
+    fi
+
+    # What the snapshot carries: every non-merge commit the stage above does not have. This
+    # is the enumeration the promotion pull request declares, and it is read from git rather
+    # than from the forge, because the forge's answer is per pull request and the question
+    # here is about a range.
+    mapfile -t commits < <(git rev-list --reverse --no-merges \
+      "refs/remotes/origin/${next}..${eligible_sha}" 2>/dev/null || true)
+    if [ "${#commits[@]}" -eq 0 ]; then
+      note "${next} is level with ${eligible_sha:0:8}; nothing to carry."
+      skipped_because "already-present"
+      continue
+    fi
+
+    # And now the question the range cannot answer: has this snapshot already been promoted?
+    #
+    # `base..head` is about ancestry, and a promotion merged under `rebase` or `squash` left
+    # `${next}` holding the same changes under different identifiers. Every commit is then
+    # still "ahead" of the stage above, so a route that stopped at the range would open the
+    # same promotion again every time the clock fired, for the rest of the repository's life.
+    #
+    # Patch-ids -- which is how the cherry-picking path answers this -- cannot help here
+    # either, and it is worth saying why, because it is the obvious fix and it does not work.
+    # That path promotes one change at a time, so under `squash` the forge's single commit is
+    # the change and its patch-id matches. A snapshot carries many commits, and `squash`
+    # collapses all of them into one whose patch-id matches none of the originals. A snapshot
+    # is also all-or-nothing, so "some of this content is present" is not an answer to
+    # anything (FR-031, FR-032).
+    #
+    # So the forge is asked, as it is for every other question this route cannot answer from
+    # a working copy: is there a merged promotion pull request into this stage whose marker
+    # names this commit? That holds under all three merge methods, because it is a fact about
+    # what the route did rather than about what the merge left behind.
+    if [ -n "$(gh pr list --repo "$REPO" --state merged --base "$next" --limit 50 --json number,body \
+      --jq "[.[] | select((.body // \"\") | contains(\"<!-- promotion-snapshot: ${next}: ${eligible_sha} -->\"))][0].number // empty")" ]; then
+      note "${eligible_sha:0:8} has already been promoted into ${next}; the merge rewrote its commits, which is why they still read as ahead."
+      skipped_because "already-present"
+      continue
+    fi
+
+    mapfile -t issues < <(issues_behind "${commits[@]}")
+    if [ "${#issues[@]}" -eq 0 ]; then
+      note "::warning::The ${#commits[@]} commit(s) ${previous} has ahead of ${next} belong to no issue this loop knows, so nothing would be labelled or closed when they land. Leaving ${next} to a person."
+      skipped_because "no-eligible-change"
+      continue
+    fi
+
+    # Any signal on any carried change stops the stage. A snapshot cannot leave one commit
+    # behind, so "promote the others" is not a thing this strategy can do, and a route that
+    # carried a held change because four other changes were ready would be defeating the
+    # hold rather than honouring it.
+    #
+    # A revert needs no arm of its own here, unlike the cherry-picking path: the revert
+    # commit is itself under the snapshot, so it travels with the change it undoes and the
+    # stage above ends up in the state the stage below is actually in.
+    blocked=""
+    for issue in "${issues[@]}"; do
+      for entry in "${HOLD_LABEL:-}" "${ROLLBACK_LABEL:-}" "${HOTFIX_LABEL:-}"; do
+        [ -n "$entry" ] || continue
+        if has_label "$issue" "$entry"; then
+          note "Issue #${issue} carries ${entry}, and a snapshot cannot leave it behind; ${next} waits."
+          blocked="$entry"
+          break 2
+        fi
+      done
+    done
+    if [ -n "$blocked" ]; then
+      case "$blocked" in
+        "${ROLLBACK_LABEL:-}") skipped_because "rollback" ;;
+        "${HOTFIX_LABEL:-}") skipped_because "hotfix" ;;
+        *) skipped_because "hold" ;;
+      esac
+      continue
+    fi
+
+    # The template's own braces are quoted rather than backslash-escaped, and the default is
+    # a statement of its own: `${VAR:-promote/{stage}-{sha}}` reads its default as far as the
+    # first `}` it can, which produced `promote/test-<sha>-<sha>}` and a name the branch-write
+    # guard then refused -- correctly, and for the wrong reason.
+    short="${eligible_sha:0:8}"
+    snapshot_branch="${SNAPSHOT_BRANCH_TEMPLATE:-}"
+    [ -n "$snapshot_branch" ] || snapshot_branch='promote/{stage}-{sha}'
+    snapshot_branch="${snapshot_branch//"{stage}"/"$next"}"
+    snapshot_branch="${snapshot_branch//"{sha}"/"$short"}"
+
+    # A head from a previous attempt, still there.
+    #
+    # Reached only once the content check above has said there is still something to carry,
+    # which is what makes this case what it sounds like: a promotion that was opened and not
+    # merged. A merged one leaves its head behind too -- no code path deletes a branch
+    # (FR-029) -- and answering `already-present` above is the difference between a quiet
+    # correct run and a warning every half hour for the rest of the week.
+    #
+    # Nothing is force-pushed under this strategy, so the route does not get to decide what
+    # happens to it: FR-051 put a hold on the changes when the promotion was closed, and the
+    # branch is a person's to remove.
+    if git ls-remote --exit-code --heads origin "$snapshot_branch" >/dev/null 2>&1; then
+      note "::warning::${snapshot_branch} already exists on the forge and ${previous} still has content ${next} does not, so a promotion from this commit was opened and not merged. Nothing is force-pushed under env-promotion; ${next} waits until somebody removes that branch or the stage moves on."
+      skipped_because "already-present"
+      continue
+    fi
+
+    # The deny-list applies to what this job is about to write, exactly as it does to an
+    # agent's push: a stage, the branch point or a release branch is never a promotion head
+    # (FR-063). It is the snapshot template's job to produce a name this allows.
+    if ! BRANCH="$snapshot_branch" \
+      DENIED_BRANCHES="${STAGE_BRANCHES}" \
+      RELEASE_PATTERN="${RELEASE_PATTERN:-}" \
+      BRANCH_PATTERN="${PROMOTION_BRANCH_PATTERN:-^promote/}" \
+      DEFAULT_BRANCH="${DEFAULT_BRANCH:-}" \
+      bash "${GITHUB_ACTION_PATH}/../guard-branch-write/guard-branch-write.sh"; then
+      note "Refusing to write ${snapshot_branch}; nothing done for ${next}."
+      continue
+    fi
+
+    git switch --detach "$eligible_sha" >/dev/null 2>&1
+
+    # One changelog entry per carried issue, riding the head before the push, as under the
+    # cherry-picking path: an entry pushed to the stage branch would be this route writing a
+    # protected branch directly (FR-031). A changelog that cannot be written does not stop a
+    # promotion; the record is not the change.
+    for issue in "${issues[@]}"; do
+      if ! STAGE="$next" \
+        ISSUE_NUMBER="$issue" \
+        COMMIT_SHA="$(git rev-parse HEAD)" \
+        HEAD_BRANCH="" \
+        MAX_ENTRIES="${MAX_ENTRIES:-20}" \
+        GIT_IDENTITY="${GIT_IDENTITY:-$(git config user.name)}" \
+        bash "${GITHUB_ACTION_PATH}/../update-changelog/update-changelog.sh"; then
+        note "::warning::Issue #${issue}: the changelog entry for ${next} could not be written; promoting without it."
+      fi
+    done
+
+    # No lease and no force: the branch is new, and a name that already existed was refused
+    # above. A snapshot that could be force-pushed would be a moving head again, which is
+    # the thing this strategy exists to avoid.
+    git push origin "HEAD:refs/heads/${snapshot_branch}"
+
+    # One marker per carried issue, which is what FR-051 reads to label and close every one
+    # of them, and what the gate reads to check each carries the stage below's label
+    # (FR-056). The promotion marker names the stage and the pull request that produced the
+    # eligible commit, in the grammar every existing reader already matches.
+    carried=""
+    for issue in "${issues[@]}"; do
+      carried="${carried}
+<!-- implement-issue: ${issue} -->"
+    done
+
+    # The snapshot marker names the commit rather than a pull request, and it is what makes
+    # a second promotion of the same commit answerable after the first one has merged and
+    # the merge method has rewritten every sha it carried.
+    body="Promotes \`${previous}\` to \`${next}\` as of \`${eligible_sha:0:8}\`.
+
+This is a snapshot, not \`${previous}\` itself: anything merged into \`${previous}\` after this pull request opened is not in it, and travels on the next promotion.
+
+It carries ${#commits[@]} commit(s) and ${#issues[@]} issue(s): $(printf '#%s ' "${issues[@]}")
+${carried}
+<!-- promotion-pr: ${next}: ${eligible_pr} -->
+<!-- promotion-snapshot: ${next}: ${eligible_sha} -->"
+
+    new_pr="$(gh pr create --repo "$REPO" --base "$next" --head "$snapshot_branch" \
+      --title "${TITLE_PREFIX:-[bot] }promote ${previous} to ${next}" --body "$body" |
+      grep -oE '[0-9]+$' || true)"
+
+    note "Opened promotion pull request #${new_pr:-?} into ${next}, carrying ${#issues[@]} issue(s)."
+    promoted=$((promoted + 1))
+    reason="promoted"
+  done
+}
+
 if [ "${BRANCH_STRATEGY:-}" = "env-promotion" ]; then
-  note "This repository promotes by snapshotting the previous stage, which this route does not build yet."
-  {
-    echo "promoted=0"
-    echo "reason=no-eligible-change"
-  } >>"${GITHUB_OUTPUT:-/dev/stdout}"
-  exit 0
+  promote_by_snapshot
+  report_and_exit
 fi
 
 for index in "${!stages[@]}"; do
@@ -310,6 +653,23 @@ for index in "${!stages[@]}"; do
       [ "$already" = true ] || to_pick+=("$sha")
     done
 
+    # Everything the previous stage has that the next one does not, *besides this change*:
+    # what the promotion is leaving behind (T238). After `change_ids`, because the change's
+    # own commits are the one thing that is not a gap -- computing this earlier counted the
+    # change itself and every promotion claimed to be leaving something behind.
+    outstanding=()
+    while IFS= read -r other; do
+      [ -n "$other" ] || continue
+      other_id="$(git show "$other" 2>/dev/null | git patch-id --stable 2>/dev/null | cut -d' ' -f1)"
+      [ -n "$other_id" ] || continue
+      seen=false
+      for known in "${present[@]}" "${change_ids[@]}"; do
+        [ "$other_id" != "$known" ] || { seen=true; break; }
+      done
+      [ "$seen" = true ] || outstanding+=("- \`$(git log -1 --format=%h "$other")\` $(git log -1 --format=%s "$other")")
+    done < <(git log --no-merges --reverse --format=%H \
+      "refs/remotes/origin/${next}..refs/remotes/origin/${previous}" 2>/dev/null | head -n 20)
+
     # Asked before "is there anything left to carry", because a change that was reverted on
     # the previous stage after an earlier promotion must stop travelling too: labelling it
     # here is what stops the next stage in the chain from taking it (FR-053).
@@ -406,7 +766,31 @@ Carrying it across is a person's job: no agent is asked to resolve a promotion c
 
     git push --force-with-lease origin "HEAD:refs/heads/${promotion_branch}"
 
-    body="Promotes the change from \`${previous}\` to \`${next}\`.
+    # What else `${previous}` has that `${next}` does not, besides this change.
+    #
+    # A promotion carries the commits of the change it was asked to carry and nothing else,
+    # which is the rule that keeps ungated work away from production. The cost of that rule
+    # is that a change built on something which arrived outside the loop -- a person's pull
+    # request, a configuration push -- travels without it and fails to build on arrival,
+    # with nothing connecting the two facts. That is exactly what happened to #47 on the
+    # canary: the components went, `@mui/material` stayed, and CI reported forty unresolved
+    # imports (T238).
+    #
+    # Named, never carried. Work waiting to be promoted is the normal state of a chain, so
+    # this is a note rather than a warning, and it is written only when there is something
+    # to say.
+    context=""
+    if [ "${#outstanding[@]}" -gt 0 ]; then
+      context="
+
+**\`${next}\` is also missing ${#outstanding[@]} other commit(s) that \`${previous}\` has**, which this promotion does not carry: a promotion carries the change it was asked to carry and nothing else. If the checks below fail on something this change did not touch, that is the first place to look.
+
+$(printf '%s\n' "${outstanding[@]}")
+
+Promote them, or carry them across deliberately. Nothing here is wrong on its own: work waiting on an earlier stage is the ordinary state of a chain."
+    fi
+
+    body="Promotes the change from \`${previous}\` to \`${next}\`.${context}
 
 <!-- implement-issue: ${issue} -->
 <!-- promotion-pr: ${next}: ${pr} -->"
@@ -425,9 +809,4 @@ Carrying it across is a person's job: no agent is asked to resolve a promotion c
     --jq '[.[] | select(.author.is_bot)] | sort_by(.mergedAt) | .[] | [.number, .mergedAt] | @tsv')
 done
 
-{
-  echo "promoted=${promoted}"
-  echo "reason=${reason}"
-} >>"${GITHUB_OUTPUT:-/dev/stdout}"
-
-note "Promotions opened: ${promoted}."
+report_and_exit
