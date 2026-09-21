@@ -1,4 +1,4 @@
-# Managed by @plainconceptsplatform/workflows@0.5.1. Source: loops/workflows/work-router.yml. Profile digest: cd84a4273d7e. Update with `workflows update --force`; consumer edits may be overwritten.
+# Managed by @plainconceptsplatform/workflows@0.5.1. Source: loops/workflows/work-router.yml. Profile digest: a586f6e065d0. Update with `workflows update --force`; consumer edits may be overwritten.
 name: "All Work Router"
 
 # Owns every repository automation trigger. Classifies each event into exactly one route,
@@ -210,6 +210,9 @@ jobs:
   # and an endpoint the token may not read makes the answer unverifiable rather than "offline"
   # (FR-070, FR-058).
   runner-preflight:
+    # The one job in this file that does not take the adopter's runner, and must not: it
+    # exists to say whether their fleet is online, and a job queued on an offline fleet
+    # never starts -- so the check that would have reported it would be the thing waiting.
     runs-on: ubuntu-latest
     timeout-minutes: 3
     permissions:
@@ -218,9 +221,9 @@ jobs:
       GH_TOKEN: ${{ github.token }}
       REPO: ${{ github.repository }}
       OWNER: ${{ github.repository_owner }}
-      TIER_AGENT: "ubuntu-latest"
-      TIER_SLIM: "ubuntu-latest"
-      TIER_CI: "ubuntu-latest"
+      TIER_AGENT: "ubuntu-24.04"
+      TIER_SLIM: "ubuntu-24.04"
+      TIER_CI: "ubuntu-24.04"
     steps:
       - name: Assert an online runner per tier
         run: |
@@ -271,7 +274,7 @@ jobs:
 
   # Public repositories must check repository permission before an event can start a model.
   authorize:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 5
     permissions:
       contents: read
@@ -357,8 +360,12 @@ jobs:
           reason: ${{ steps.check.outputs.trusted == 'true' && 'clear-to-proceed' || 'not-authorised' }}
           detail: "${{ steps.check.outputs.trusted == 'true' && format('{0} may start an agent on this repository.', github.actor) || format('{0} may not start an agent on this repository, so nothing downstream runs.', github.actor) }}"
 
+  # Every job here is a framework job and takes `runners.slim`, like every other
+  # deterministic step in the payload. They hard-coded `ubuntu-latest` until 21/09/2026,
+  # which sent them to GitHub-hosted runners whatever the profile said -- including for the
+  # organisation whose three runner tiers are all its own fleet (FR-070).
   classify:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 5
     permissions:
       contents: read
@@ -426,7 +433,7 @@ jobs:
   check-implement-pr:
     needs: [classify, authorize]
     if: needs.classify.outputs.route == 'implement' && needs.authorize.outputs.trusted == 'true'
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 3
     permissions:
       contents: read
@@ -566,7 +573,7 @@ jobs:
   dispatch-triage:
     needs: [classify, authorize]
     if: needs.classify.outputs.route == 'triage' && needs.authorize.outputs.is_outside_collaborator == 'true'
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 5
     permissions:
       actions: write
@@ -656,7 +663,7 @@ jobs:
   resolve-merge-base:
     needs: classify
     if: needs.classify.outputs.route == 'merge-gate'
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 3
     permissions:
       contents: read
@@ -777,7 +784,7 @@ jobs:
     if: >
       needs.classify.outputs.route == 'bot-approve' &&
         (github.actor == 'app/github-actions' || github.actor == 'personalcorpacc-agentic-loop[bot]')
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 5
     permissions:
       actions: write
@@ -850,7 +857,7 @@ jobs:
   stage-merge:
     needs: classify
     if: needs.classify.outputs.route == 'stage-merge'
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 5
     permissions:
       issues: write
@@ -1040,7 +1047,7 @@ jobs:
           github.event.pull_request.head.repo.full_name == github.repository
         )
       )
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 10
     permissions:
       contents: read
@@ -1262,7 +1269,7 @@ jobs:
   reconcile-bot-pr-runs:
     needs: classify
     if: needs.classify.outputs.route == 'reconcile-bot-pr-runs'
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 5
     permissions:
       contents: read
@@ -1545,7 +1552,7 @@ jobs:
   promote:
     needs: classify
     if: needs.classify.outputs.route == 'promote'
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 20
     concurrency:
       group: promote
@@ -1575,10 +1582,13 @@ jobs:
         if: always()
         uses: ./.github/actions/record-outcome
         with:
-          outcome: ${{ steps.promote.outputs.promoted == '0' && 'no-action' || 'acted' }}
-          reason: ${{ steps.promote.outputs.promoted == '0' && (steps.promote.outputs.reason || 'no-eligible-change') || 'promoted' }}
+          # A step that died reported `acted / promoted` with a hole where the count goes,
+          # because an unset output is an empty string and an empty string is not '0'. The
+          # step's own result is asked first, so a failed promotion says it failed (FR-058).
+          outcome: ${{ steps.promote.outcome == 'failure' && 'failed' || steps.promote.outputs.promoted == '0' && 'no-action' || 'acted' }}
+          reason: ${{ steps.promote.outcome == 'failure' && 'promotion-failed' || steps.promote.outputs.promoted == '0' && (steps.promote.outputs.reason || 'no-eligible-change') || 'promoted' }}
           route: promote
-          detail: "${{ steps.promote.outputs.promoted == '0' && 'Nothing was ready to promote; the step log says what was considered and why each one waited.' || format('Opened {0} promotion pull request(s).', steps.promote.outputs.promoted) }}"
+          detail: "${{ steps.promote.outcome == 'failure' && 'The promotion route stopped on an error; the step log says which change it was working on.' || steps.promote.outputs.promoted == '0' && 'Nothing was ready to promote; the step log says what was considered and why each one waited.' || format('Opened {0} promotion pull request(s).', steps.promote.outputs.promoted) }}"
 
   # The other direction of the chain, and named `sync-stages` for the same reason `promote`
   # is not `call-sync-stages`: no model runs here at all. Which content an earlier stage is
@@ -1593,7 +1603,7 @@ jobs:
   sync-stages:
     needs: classify
     if: needs.classify.outputs.route == 'sync-stages'
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 20
     concurrency:
       group: sync-stages
@@ -1635,7 +1645,7 @@ jobs:
   audit-close:
     needs: classify
     if: needs.classify.outputs.route == 'audit-close'
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 15
     concurrency:
       group: audit-close
@@ -1663,7 +1673,7 @@ jobs:
   cleanup-artifacts:
     needs: classify
     if: needs.classify.outputs.route == 'cleanup-artifacts' && !github.event.repository.fork
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 15
     concurrency:
       group: cleanup-artifacts
@@ -1692,7 +1702,7 @@ jobs:
   validate:
     needs: classify
     if: needs.classify.outputs.route == 'validate'
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 10
     permissions:
       contents: read
@@ -1703,11 +1713,58 @@ jobs:
           persist-credentials: false
       - uses: ./.github/actions/verify-route-matrix
       - uses: ./.github/actions/verify-composite-actions
+      # A credential that exists is not a credential that works. `doctor --forge` can see
+      # the secret is set and can see nothing else, because the value is only readable here;
+      # and a key with no credit answers every read-only endpoint happily and refuses only
+      # at inference. So this spends one token to ask (FR-087), which is the difference
+      # between finding out now and finding out after an issue has been reserved, an agent
+      # has started and a runner has been paid for.
+      - name: Ask whether the model credential can pay
+        id: credit
+        if: always()
+        env:
+          CREDENTIAL: ${{ secrets.ANTHROPIC_API_KEY }}
+          PROBE: "anthropic-messages"
+          MODEL: "claude-sonnet-5"
+          REFUSAL_SIGNATURE: "billing_error|credit balance is too low"
+        run: |
+          set -uo pipefail
+          if [ -z "${PROBE:-}" ]; then
+            echo "::notice::No credit probe is characterised for this repository's engine, so whether the account will pay is unknown until an agent runs. The engine table names a probe only for the shapes this project has watched succeed and fail."
+            exit 0
+          fi
+          if [ -z "${CREDENTIAL:-}" ]; then
+            echo "::error::The model credential secret is empty, so no agent can run at all."
+            exit 1
+          fi
+
+          case "$PROBE" in
+            anthropic-messages)
+              answer="$(curl --silent --show-error --max-time 30 \
+                -H "x-api-key: ${CREDENTIAL}" \
+                -H "anthropic-version: 2023-06-01" \
+                -H "content-type: application/json" \
+                -d "{\"model\":\"${MODEL}\",\"max_tokens\":1,\"messages\":[{\"role\":\"user\",\"content\":\".\"}]}" \
+                https://api.anthropic.com/v1/messages 2>&1)"
+              ;;
+            *)
+              echo "::warning::${PROBE} is named as this engine's credit probe and this router does not implement it; treating the account as unknown."
+              exit 0
+              ;;
+          esac
+
+          # The status is not the answer: a refusal is a 400 like several other things, and
+          # the provider's own words are what the implement worker stops on too.
+          if printf '%s' "$answer" | grep -qiE "${REFUSAL_SIGNATURE}"; then
+            echo "::error::The account behind this repository's model credential will not pay: the provider answered with its refusal. Nothing else here is wrong, and no agent can run until it is topped up."
+            exit 1
+          fi
+          echo "::notice::The model credential answered, so the account will pay for a run."
       - name: Record the outcome
         if: always()
         uses: ./.github/actions/record-outcome
         with:
           outcome: ${{ job.status == 'success' && 'acted' || 'failed' }}
-          reason: ${{ job.status == 'success' && 'acted' || 'invalid-input' }}
+          reason: ${{ job.status == 'success' && 'acted' || steps.credit.outcome == 'failure' && 'no-model-credit' || 'invalid-input' }}
           route: validate
-          detail: "${{ job.status == 'success' && 'The route matrix and every composite manifest agree with the installed files.' || 'The route matrix or a composite manifest disagrees with the installed files; the run log names which.' }}"
+          detail: "${{ job.status == 'success' && 'The route matrix and every composite manifest agree with the installed files, and the model credential can pay.' || steps.credit.outcome == 'failure' && 'The installed files agree, but the account behind the model credential will not pay for a run.' || 'The route matrix or a composite manifest disagrees with the installed files; the run log names which.' }}"
