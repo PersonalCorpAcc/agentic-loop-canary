@@ -1,6 +1,13 @@
 {
   "changes": [
     {
+      "timestamp": "2026-09-18T19:39:22Z",
+      "issue": 47,
+      "title": "Adopt the design system: copy the components in and mount the provider",
+      "summary": "Copy the RiskPoint theme kit into src/ and mount the provider",
+      "commit": "1332871"
+    },
+    {
       "timestamp": "2026-09-17T20:00:17Z",
       "issue": 8,
       "title": "Add Sort for version slices",
