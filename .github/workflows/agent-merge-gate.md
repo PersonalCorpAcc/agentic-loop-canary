@@ -251,18 +251,29 @@ jobs:
   # opened it, it is carrying real work, and nothing else is going to notice. Its own job,
   # rather than a write permission on `subject`, so the common path keeps read-only
   # (FR-056, FR-084).
+  #
+  # `if: always()` with every step conditioned, which is the shape `review_required` uses and
+  # is not a style choice. gh-aw hoists every custom job into the agent job's `needs`, and a
+  # job whose `needs` contains a **skipped** job is itself skipped -- so a custom job that
+  # skips in the ordinary case silently disables the agent for every pull request, not just
+  # the ones it was written for. The first version of this job had `if: needs.subject.outputs
+  # .handover == 'true'` and did exactly that: the gate stopped assessing anything, and the
+  # compile, the route matrix and the whole suite stayed green. Only a live run showed it
+  # (canary PR #100, 21/09/2026).
   handover:
     needs: subject
-    if: needs.subject.outputs.handover == 'true'
+    if: always()
     runs-on: ubuntu-24.04
     permissions:
       pull-requests: write
     steps:
       - name: Checkout workflow actions
+        if: needs.subject.outputs.handover == 'true'
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
       - name: Say on the pull request why the gate did not run
+        if: needs.subject.outputs.handover == 'true'
         uses: ./.github/actions/create-issue-comment
         with:
           token: ${{ github.token }}
@@ -286,7 +297,7 @@ jobs:
             this pull request, which holds every change it carries until somebody says
             otherwise.
       - name: Record the outcome
-        if: always()
+        if: needs.subject.outputs.handover == 'true'
         uses: ./.github/actions/record-outcome
         with:
           outcome: handed-to-human
