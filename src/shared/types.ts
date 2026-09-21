@@ -25,17 +25,10 @@ export interface LoopRun {
   readonly url: string;
 }
 
-/**
- * What the server pushes over the socket as runs begin and end.
- *
- * `degraded` rides on `snapshot` too, not just `health`, because a tab that connects (or
- * reconnects) while polling is already failing needs to know that from the first message it
- * gets -- the socket carries facts, not just deltas, and "polling is unhealthy" is a fact.
- */
+/** What the server pushes over the socket as runs begin and end. */
 export type LoopEvent =
-  | { readonly kind: "snapshot"; readonly runs: readonly LoopRun[]; readonly degraded: boolean }
-  | { readonly kind: "run"; readonly run: LoopRun }
-  | { readonly kind: "health"; readonly degraded: boolean };
+  | { readonly kind: "snapshot"; readonly runs: readonly LoopRun[] }
+  | { readonly kind: "run"; readonly run: LoopRun };
 
 export const outcomes: readonly Outcome[] = ["acted", "no-action", "handed-to-human", "failed"];
 
