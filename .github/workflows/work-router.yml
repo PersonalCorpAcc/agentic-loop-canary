@@ -1618,12 +1618,17 @@ jobs:
         uses: ./.github/actions/sync-stages
         with:
           token: ${{ steps.app-token.outputs.token }}
+          auto-merge-mode: "always"
+          auto-merge-targets: "dev,test"
       - name: Record the outcome
         if: always()
         uses: ./.github/actions/record-outcome
         with:
-          outcome: ${{ steps.sync.outputs.opened == '0' && (steps.sync.outputs.reason == 'conflict-handed-off' && 'handed-to-human' || 'no-action') || 'acted' }}
-          reason: ${{ steps.sync.outputs.opened == '0' && (steps.sync.outputs.reason || 'stages-aligned') || 'acted' }}
+          # The reason is read before the count: a run that repaired two hops and handed a
+          # third to a person is handed-to-human, because that is the part somebody has to
+          # act on (FR-086, FR-058).
+          outcome: ${{ steps.sync.outputs.reason == 'conflict-handed-off' && 'handed-to-human' || steps.sync.outputs.opened == '0' && 'no-action' || 'acted' }}
+          reason: ${{ steps.sync.outputs.reason || (steps.sync.outputs.opened == '0' && 'stages-aligned' || 'acted') }}
           route: sync-stages
           detail: "${{ steps.sync.outputs.opened == '0' && 'Every stage carries the content of the ones after it, or the step log says which pair could not be carried and why.' || format('Opened {0} pull request(s) carrying content back down the chain.', steps.sync.outputs.opened) }}"
 
