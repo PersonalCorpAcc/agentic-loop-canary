@@ -1,6 +1,13 @@
 {
   "changes": [
     {
+      "timestamp": "2026-09-22T09:52:36+01:00",
+      "issue": 47,
+      "title": "Adopt the design system: copy the components in and mount the provider",
+      "summary": "Merge pull request #109 from PersonalCorpAcc/promote/test-72f16927",
+      "commit": "69e977c"
+    },
+    {
       "timestamp": "2026-09-18T19:39:22Z",
       "issue": 47,
       "title": "Adopt the design system: copy the components in and mount the provider",
