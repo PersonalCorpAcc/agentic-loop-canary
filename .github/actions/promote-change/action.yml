@@ -1,4 +1,4 @@
-# Managed by @plainconceptsplatform/workflows@0.5.1. Source: loops/actions/promote-change/action.yml. Profile digest: 17b8a563c65f. Update with workflows update --force; consumer edits may be overwritten.
+# Managed by @plainconceptsplatform/workflows@0.5.1. Source: loops/actions/promote-change/action.yml. Profile digest: b7d3498150a7. Update with workflows update --force; consumer edits may be overwritten.
 name: Promote change
 description: >
   Move the changes that are ready one stage along the chain: recreate the branch on the next
@@ -35,7 +35,7 @@ inputs:
   merge-method:
     description: How the forge merged the change onto the previous stage, which decides where its commits are found.
     required: false
-    default: 'squash'
+    default: 'merge'
   branch-strategy:
     description: The branching strategy, because env-promotion carries a snapshot rather than commits.
     required: false
@@ -43,7 +43,7 @@ inputs:
   branch-point:
     description: The branch changes are cut from. Its commits are reachable from a pull request and are not part of the change.
     required: false
-    default: 'main'
+    default: 'dev'
   release-pattern:
     description: Extended regular expression matching release branches, so the guard refuses them as promotion heads.
     required: false

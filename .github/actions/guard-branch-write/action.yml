@@ -1,4 +1,4 @@
-# Managed by @plainconceptsplatform/workflows@0.5.1. Source: loops/actions/guard-branch-write/action.yml. Profile digest: 17b8a563c65f. Update with workflows update --force; consumer edits may be overwritten.
+# Managed by @plainconceptsplatform/workflows@0.5.1. Source: loops/actions/guard-branch-write/action.yml. Profile digest: b7d3498150a7. Update with workflows update --force; consumer edits may be overwritten.
 name: Guard branch write
 description: >
   Refuse to write a branch this loop does not name, or one it promotes into, cuts from,
@@ -10,7 +10,7 @@ inputs:
   denied-branches:
     description: Branches this loop may open a pull request against but never push. The stages and the branch point.
     required: false
-    default: 'main,dev,test'
+    default: 'dev,test,main'
   release-pattern:
     description: Extended regular expression matching release branches, empty when the strategy cuts none.
     required: false

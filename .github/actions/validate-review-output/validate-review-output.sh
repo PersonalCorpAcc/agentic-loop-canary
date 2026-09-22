@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Managed by @plainconceptsplatform/workflows@0.5.1. Source: loops/actions/validate-review-output/validate-review-output.sh. Profile digest: 17b8a563c65f. Update with `workflows update --force`; consumer edits may be overwritten.
+# Managed by @plainconceptsplatform/workflows@0.5.1. Source: loops/actions/validate-review-output/validate-review-output.sh. Profile digest: b7d3498150a7. Update with `workflows update --force`; consumer edits may be overwritten.
 # Print implemented, already-satisfied, needs-human, or invalid.
 
 set -euo pipefail

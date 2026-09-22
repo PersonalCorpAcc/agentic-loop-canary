@@ -1,46 +1,11 @@
 {
   "changes": [
     {
-      "timestamp": "2026-09-22T10:16:48Z",
-      "issue": 107,
-      "title": "Show when a stage is frozen, and by what",
-      "summary": "Record #97",
-      "commit": "93afa7e"
-    },
-    {
-      "timestamp": "2026-09-22T10:16:48Z",
-      "issue": 97,
-      "title": "Name the branching strategy on the dashboard header",
-      "summary": "Record #96",
-      "commit": "29e8355"
-    },
-    {
-      "timestamp": "2026-09-22T10:16:48Z",
-      "issue": 96,
-      "title": "Show which issues a promotion carried",
-      "summary": "Record #53",
-      "commit": "05900df"
-    },
-    {
-      "timestamp": "2026-09-22T10:16:47Z",
-      "issue": 53,
-      "title": "Fix stale-recovery's CI-failure poll so it actually finds the run",
-      "summary": "Record #52",
-      "commit": "9e3f9fa"
-    },
-    {
-      "timestamp": "2026-09-22T10:16:47Z",
-      "issue": 52,
-      "title": "Surface polling health so a stale dashboard doesn't look live",
-      "summary": "Record #47",
-      "commit": "1657a37"
-    },
-    {
-      "timestamp": "2026-09-22T09:52:36+01:00",
+      "timestamp": "2026-09-19T07:52:23+01:00",
       "issue": 47,
       "title": "Adopt the design system: copy the components in and mount the provider",
-      "summary": "Merge pull request #109 from PersonalCorpAcc/promote/test-72f16927",
-      "commit": "69e977c"
+      "summary": "Carry the release push fix to main",
+      "commit": "e31221b"
     },
     {
       "timestamp": "2026-09-18T19:39:22Z",
