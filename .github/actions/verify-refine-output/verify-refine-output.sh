@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Managed by @plainconceptsplatform/workflows@0.5.1. Source: loops/actions/verify-refine-output/verify-refine-output.sh. Profile digest: 685c377153a2. Update with `workflows update --force`; consumer edits may be overwritten.
+# Managed by @plainconceptsplatform/workflows@0.5.1. Source: loops/actions/verify-refine-output/verify-refine-output.sh. Profile digest: b7d3498150a7. Update with `workflows update --force`; consumer edits may be overwritten.
 # Exercise real validation script so incomplete agent output cannot be applied.
 
 set -euo pipefail
