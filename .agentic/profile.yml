@@ -78,7 +78,20 @@ projects:
 
 branching:
   strategy: env-promotion
-  cutFrom: main
+  # `dev`, the first stage, since 22/09/2026, and not `main`.
+  #
+  # Cutting from `main` while merging by squash diverges the stages permanently: `dev` and
+  # `main` get the same content under different commits, so the merge base of a feature
+  # branch and `dev` is older than either, and every agent pull request's diff carries the
+  # whole install back with it. That is not cosmetic -- the protected-files rule reads that
+  # diff, so every change tripped it and went to review. On PR #98 the merge would have
+  # altered 4 files and the rule was shown about 100. The same divergence made a `test` to
+  # `main` carry conflict (#101, #104).
+  #
+  # The first stage is what FR-086 calls the shape that cannot drift: the pull request targets
+  # the branch the work was cut from, so `base..head` is the change and nothing else, however
+  # far the stages above have gone their own way.
+  cutFrom: dev
   chain: [dev, test, main]
   # Two issues may be implemented at once. The shipped default is 1, which is what the
   # inherited loop did: one global group, every implement waiting for the one before it. Two
@@ -88,12 +101,14 @@ branching:
   # A concurrency group cannot express "at most N", so this selects the shape rather than a
   # limit: above 1 the ceiling is the runner fleet, not this number.
   concurrentImplements: 4
-  # Kept at `squash` although `rebase` is this strategy's conventional method, so the
-  # profile warns about it -- deliberately, on both counts. Squash is what this repository
-  # has been running, and it is the harder case: a squashed promotion collapses the
-  # snapshot's many commits into one, so every commit it carried still reads as ahead of the
-  # stage above on the next run. That is what the promotion marker is for.
-  mergeMethod: squash
+  # `merge`, which is this strategy's conventional method and is a mechanic rather than a
+  # taste. A promotion head here is a snapshot of `dev`, and only a merge commit leaves that
+  # snapshot an ancestor of `test`. Under `squash` -- which this repository ran until
+  # 22/09/2026 -- the stage got one new commit instead, so the snapshot's commits were
+  # ancestors of nothing, the next snapshot's merge base had not moved, and the second
+  # promotion re-applied work `test` already had: five conflicting files that nobody had
+  # touched twice (#109). `rebase` has the same shape, for the same reason.
+  mergeMethod: merge
   closeIssueOn: main
   branchNaming: agent/{issue}-{run}
   # Short, because a canary that soaked for a day would prove one promotion a day.

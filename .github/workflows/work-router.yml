@@ -1,4 +1,4 @@
-# Managed by @plainconceptsplatform/workflows@0.5.1. Source: loops/workflows/work-router.yml. Profile digest: 17b8a563c65f. Update with `workflows update --force`; consumer edits may be overwritten.
+# Managed by @plainconceptsplatform/workflows@0.5.1. Source: loops/workflows/work-router.yml. Profile digest: b7d3498150a7. Update with `workflows update --force`; consumer edits may be overwritten.
 name: "All Work Router"
 
 # Owns every repository automation trigger. Classifies each event into exactly one route,
@@ -682,7 +682,7 @@ jobs:
           REPO: ${{ github.repository }}
           PR_NUMBER: ${{ needs.classify.outputs.pr-number }}
           DISPATCH_BASE: ${{ inputs.base-branch }}
-          KNOWN_BRANCHES: "main,dev,test"
+          KNOWN_BRANCHES: "dev,test,main"
           FALLBACK_BASE: "dev"
         run: |
           set -euo pipefail
@@ -1084,7 +1084,7 @@ jobs:
       issues: read
     env:
       HOTFIX_LABEL: "hotfix"
-      TRUNK: "main"
+      TRUNK: "dev"
     steps:
       - name: Decide whether this merge is a hotfix on a release branch
         id: decide

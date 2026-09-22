@@ -1,4 +1,4 @@
-// Managed by @plainconceptsplatform/workflows@0.5.1. Source: loops/scripts/compile-agent-workflows.mjs. Profile digest: 17b8a563c65f. Update with `workflows update --force`; consumer edits may be overwritten.
+// Managed by @plainconceptsplatform/workflows@0.5.1. Source: loops/scripts/compile-agent-workflows.mjs. Profile digest: b7d3498150a7. Update with `workflows update --force`; consumer edits may be overwritten.
 
 const OPENCODE_VERSION = '1.18.23'
 import { spawnSync } from "node:child_process";
@@ -291,7 +291,7 @@ for (const file of readdirSync(workflowDirectory)) {
       const span = rewritten.slice(start, end).replace(
         /(uses: actions\/checkout@[^\n]*\n(\s+)with:\n(?:\2  [^\n]+\n)*)/,
         (whole, _block, indent) =>
-          whole.includes("ref:") ? whole : whole + indent + "  ref: main\n",
+          whole.includes("ref:") ? whole : whole + indent + "  ref: dev\n",
       );
       rewritten = rewritten.slice(0, start) + span + rewritten.slice(end);
     }
