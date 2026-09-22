@@ -2,6 +2,13 @@
   "changes": [
     {
       "timestamp": "2026-09-22T10:16:48Z",
+      "issue": 107,
+      "title": "Show when a stage is frozen, and by what",
+      "summary": "Record #97",
+      "commit": "93afa7e"
+    },
+    {
+      "timestamp": "2026-09-22T10:16:48Z",
       "issue": 97,
       "title": "Name the branching strategy on the dashboard header",
       "summary": "Record #96",
