@@ -1,6 +1,13 @@
 {
   "changes": [
     {
+      "timestamp": "2026-09-19T07:52:23+01:00",
+      "issue": 47,
+      "title": "Adopt the design system: copy the components in and mount the provider",
+      "summary": "Carry the release push fix to main",
+      "commit": "e31221b"
+    },
+    {
       "timestamp": "2026-09-18T19:39:22Z",
       "issue": 47,
       "title": "Adopt the design system: copy the components in and mount the provider",
