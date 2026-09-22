@@ -2,6 +2,13 @@
   "changes": [
     {
       "timestamp": "2026-09-22T10:16:47Z",
+      "issue": 53,
+      "title": "Fix stale-recovery's CI-failure poll so it actually finds the run",
+      "summary": "Record #52",
+      "commit": "9e3f9fa"
+    },
+    {
+      "timestamp": "2026-09-22T10:16:47Z",
       "issue": 52,
       "title": "Surface polling health so a stale dashboard doesn't look live",
       "summary": "Record #47",
