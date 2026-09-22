@@ -1,5 +1,5 @@
 ---
-# Managed by @plainconceptsplatform/workflows@0.5.1. Source: loops/workflows/agent-merge-gate.md. Profile digest: 685c377153a2. Update with `workflows update --force`; consumer edits may be overwritten.
+# Managed by @plainconceptsplatform/workflows@0.5.1. Source: loops/workflows/agent-merge-gate.md. Profile digest: b7d3498150a7. Update with `workflows update --force`; consumer edits may be overwritten.
 env:
   VERIFY_COMMANDS: "pnpm install --frozen-lockfile && pnpm run build && pnpm run test"
   REPO_RULES: "Make a risk-based merge decision for the selected bot pull request. Merge only when CI is green and no risk indicators are present. Review risk indicators defined in the repository's guardrails or project documentation. Any of these require human review. Do not merge protected file changes."
@@ -13,7 +13,7 @@ env:
   PR_PENDING_LABEL: pr-pending
   # How the forge merges here. A profile value, because a rebase repository and a squash
   # repository disagree about what a merge even is (FR-026).
-  MERGE_METHOD: "squash"
+  MERGE_METHOD: "merge"
   # What happens to a conflict. Under `merge-target` the agent merges the base in and
   # resolves, which is all it can do: its push applies a bundle fast-forward only, so a
   # rebase would be computed, refused and lost. Under `human` it does not try at all

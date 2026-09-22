@@ -101,12 +101,14 @@ branching:
   # A concurrency group cannot express "at most N", so this selects the shape rather than a
   # limit: above 1 the ceiling is the runner fleet, not this number.
   concurrentImplements: 4
-  # Kept at `squash` although `rebase` is this strategy's conventional method, so the
-  # profile warns about it -- deliberately, on both counts. Squash is what this repository
-  # has been running, and it is the harder case: a squashed promotion collapses the
-  # snapshot's many commits into one, so every commit it carried still reads as ahead of the
-  # stage above on the next run. That is what the promotion marker is for.
-  mergeMethod: squash
+  # `merge`, which is this strategy's conventional method and is a mechanic rather than a
+  # taste. A promotion head here is a snapshot of `dev`, and only a merge commit leaves that
+  # snapshot an ancestor of `test`. Under `squash` -- which this repository ran until
+  # 22/09/2026 -- the stage got one new commit instead, so the snapshot's commits were
+  # ancestors of nothing, the next snapshot's merge base had not moved, and the second
+  # promotion re-applied work `test` already had: five conflicting files that nobody had
+  # touched twice (#109). `rebase` has the same shape, for the same reason.
+  mergeMethod: merge
   closeIssueOn: main
   branchNaming: agent/{issue}-{run}
   # Short, because a canary that soaked for a day would prove one promotion a day.
