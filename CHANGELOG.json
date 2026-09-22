@@ -1,6 +1,13 @@
 {
   "changes": [
     {
+      "timestamp": "2026-09-22T10:16:48Z",
+      "issue": 96,
+      "title": "Show which issues a promotion carried",
+      "summary": "Record #53",
+      "commit": "05900df"
+    },
+    {
       "timestamp": "2026-09-22T10:16:47Z",
       "issue": 53,
       "title": "Fix stale-recovery's CI-failure poll so it actually finds the run",
