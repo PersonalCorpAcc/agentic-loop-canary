@@ -1,5 +1,5 @@
 ---
-# Managed by @plainconceptsplatform/workflows@0.5.1. Source: loops/workflows/agent-implement.md. Profile digest: 17b8a563c65f. Update with `workflows update --force`; consumer edits may be overwritten.
+# Managed by @plainconceptsplatform/workflows@0.5.1. Source: loops/workflows/agent-implement.md. Profile digest: 685c377153a2. Update with `workflows update --force`; consumer edits may be overwritten.
 env:
   VERIFY_COMMANDS: "pnpm install --frozen-lockfile && pnpm run build && pnpm run test"
   REPO_RULES: "Implement only the selected issue. Follow the repository's own documentation and conventions, and do not weaken tests or bypass checks."
@@ -46,7 +46,7 @@ env:
   BASE_BRANCH: "dev"
   # The branch the work is cut from. Equal to the base under trunk, and a different
   # branch under a chain, which is what the base-rewrite check turns on (FR-061).
-  BRANCH_POINT: "main"
+  BRANCH_POINT: "dev"
   GH_AW_ALLOWED_BOTS: "personalcorpacc-agentic-loop[bot],github-actions[bot]"
 description: |
   Implements an issue and opens a pull request. Stops there: the merge decision belongs to

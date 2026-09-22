@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Managed by @plainconceptsplatform/workflows@0.5.1. Source: loops/actions/promote-change/promote-change.sh. Profile digest: 17b8a563c65f. Update with `workflows update --force`; consumer edits may be overwritten.
+# Managed by @plainconceptsplatform/workflows@0.5.1. Source: loops/actions/promote-change/promote-change.sh. Profile digest: 685c377153a2. Update with `workflows update --force`; consumer edits may be overwritten.
 #
 # Move the changes that are ready one stage along the chain (FR-031).
 #
@@ -284,7 +284,7 @@ issues_behind() {
 # containing it is an ancestor of every commit after it.
 promote_by_snapshot() {
   local index previous next soak_seconds eligible_sha eligible_pr merged_epoch age
-  local pr merged_at oid had_merge snapshot_branch short carried blocked issue entry
+  local pr merged_at oid had_merge snapshot_branch short carried blocked blockers issue entry
   local -a commits issues
 
   for index in "${!stages[@]}"; do
@@ -420,18 +420,32 @@ promote_by_snapshot() {
     # A revert needs no arm of its own here, unlike the cherry-picking path: the revert
     # commit is itself under the snapshot, so it travels with the change it undoes and the
     # stage above ends up in the state the stage below is actually in.
+    # Every blocker, not the first one found.
+    #
+    # Stopping at the first is what a per-change strategy would do, because there the answer
+    # is about that change. Here the answer is about the stage: nothing leaves `${previous}`
+    # until every one of these is cleared, so a person who clears the one the route named
+    # comes back to find the stage still frozen, with a different name on it. Observed on the
+    # canary, 21/09/2026: two labels left by earlier sessions, reported one at a time, and in
+    # between them the pipeline looked like it had a new problem rather than the same one.
     blocked=""
+    blockers=""
     for issue in "${issues[@]}"; do
       for entry in "${HOLD_LABEL:-}" "${ROLLBACK_LABEL:-}" "${HOTFIX_LABEL:-}"; do
         [ -n "$entry" ] || continue
         if has_label "$issue" "$entry"; then
-          note "Issue #${issue} carries ${entry}, and a snapshot cannot leave it behind; ${next} waits."
-          blocked="$entry"
-          break 2
+          blockers="${blockers}
+- #${issue} carries \`${entry}\`"
+          # The first one decides the outcome code, because the enumeration has one slot and
+          # the ranking in `skipped_because` already says which kind most wants a person.
+          [ -n "$blocked" ] || blocked="$entry"
+          break
         fi
       done
     done
     if [ -n "$blocked" ]; then
+      note "::warning::${next} is frozen: a promotion carries a snapshot of ${previous} and cannot leave any of these behind.${blockers}"
+      note "Nothing moves out of ${previous} until every one of them is cleared."
       case "$blocked" in
         "${ROLLBACK_LABEL:-}") skipped_because "rollback" ;;
         "${HOTFIX_LABEL:-}") skipped_because "hotfix" ;;
