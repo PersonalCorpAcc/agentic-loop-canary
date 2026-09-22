@@ -1,6 +1,8 @@
 import { useEffect, useMemo, useState, type ReactElement } from "react";
 
-import type { LoopEvent, LoopRun } from "../shared/types.js";
+import { StatusBadge } from "@/components/primitives";
+
+import type { LoopEvent, LoopRun, Stage } from "../shared/types.js";
 import { needsAttention } from "../shared/types.js";
 
 /**
@@ -14,6 +16,7 @@ export function App(): ReactElement {
   const [runs, setRuns] = useState<readonly LoopRun[]>([]);
   const [live, setLive] = useState(false);
   const [strategy, setStrategy] = useState<string | null>(null);
+  const [stages, setStages] = useState<readonly Stage[]>([]);
 
   useEffect(() => {
     const socket = new WebSocket(socketUrl(location));
@@ -35,6 +38,21 @@ export function App(): ReactElement {
       .catch(() => setStrategy(null));
   }, []);
 
+  useEffect(() => {
+    // A frozen stage stays frozen "indefinitely" (the issue that prompted this), so nothing
+    // else on the page is guaranteed to trigger a refetch; a plain interval is what notices
+    // it clearing.
+    const fetchStages = (): void => {
+      fetch("/api/stages")
+        .then((response) => response.json() as Promise<Stage[]>)
+        .then(setStages)
+        .catch(() => setStages([]));
+    };
+    fetchStages();
+    const interval = setInterval(fetchStages, 30_000);
+    return () => clearInterval(interval);
+  }, []);
+
   const ordered = useMemo(() => [...runs].sort(compareRuns), [runs]);
   const waiting = ordered.filter(needsAttention).length;
 
@@ -48,6 +66,30 @@ export function App(): ReactElement {
           {strategy ? ` · ${strategy}` : ""}
         </p>
       </header>
+      {stages.length > 0 && (
+        <section aria-label="stages">
+          <ol>
+            {stages.map((stage) => (
+              <li key={stage.name} data-frozen={stage.frozen}>
+                <span>{stage.name}</span>
+                {stage.frozen && (
+                  <>
+                    <StatusBadge kind="stage" state="frozen" />
+                    <span>
+                      {stage.blockedBy.map((block, index) => (
+                        <span key={block.issue}>
+                          {index > 0 ? ", " : ""}
+                          <a href={block.url}>#{block.issue}</a> ({block.label})
+                        </span>
+                      ))}
+                    </span>
+                  </>
+                )}
+              </li>
+            ))}
+          </ol>
+        </section>
+      )}
       <ol>
         {ordered.map((run) => (
           <li key={run.id} data-attention={needsAttention(run)}>

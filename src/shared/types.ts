@@ -33,6 +33,28 @@ export interface LoopRun {
   readonly carriedIssues?: readonly number[];
 }
 
+/** One issue that stops a stage's next promotion, and the label it carries. */
+export interface StageBlock {
+  readonly issue: number;
+  readonly label: string;
+  readonly url: string;
+}
+
+/**
+ * One stage of the installed branching strategy's chain.
+ *
+ * Under `env-promotion` a promotion carries every merged change on a stage as one
+ * all-or-nothing snapshot, so a `hold`, `rollback` or `hotfix` label on any one of them
+ * stops every promotion out of that stage, not just the change it is on. `blockedBy` names
+ * every issue currently doing that; a stage with none is not frozen, and the last stage in
+ * the chain -- which nothing promotes out of -- is never frozen.
+ */
+export interface Stage {
+  readonly name: string;
+  readonly frozen: boolean;
+  readonly blockedBy: readonly StageBlock[];
+}
+
 /** What the server pushes over the socket as runs begin and end. */
 export type LoopEvent =
   | { readonly kind: "snapshot"; readonly runs: readonly LoopRun[]; readonly at?: string }
