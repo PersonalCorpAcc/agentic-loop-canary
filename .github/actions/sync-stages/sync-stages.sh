@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Managed by @plainconceptsplatform/workflows@0.5.1. Source: loops/actions/sync-stages/sync-stages.sh. Profile digest: 17b8a563c65f. Update with `workflows update --force`; consumer edits may be overwritten.
+# Managed by @plainconceptsplatform/workflows@0.5.1. Source: loops/actions/sync-stages/sync-stages.sh. Profile digest: b7d3498150a7. Update with `workflows update --force`; consumer edits may be overwritten.
 #
 # Carry a change that arrived on a later stage back down the chain (FR-079).
 #
@@ -77,13 +77,26 @@ if [ "${#stages[@]}" -lt 2 ]; then
   finish
 fi
 
-# env-promotion's later stages are snapshots of the branch before them rather than histories
-# of their own, so "content the earlier stage is missing" is not a question about commits
-# there. Promotion does not build that path either (T169); neither does this.
-if [ "${BRANCH_STRATEGY:-}" = "env-promotion" ]; then
-  note "This repository promotes by snapshotting the previous stage, so a stage cannot hold content another one is missing."
-  finish
-fi
+# There used to be an early exit here for `env-promotion`, on the grounds that its later
+# stages are snapshots of the branch before them rather than histories of their own, so a
+# stage could not hold content another one is missing.
+#
+# That is true of everything the loop does and says nothing about people, which is the only
+# drift this route exists for: FR-079 is about a person pushing to a later stage. On
+# 22/09/2026 three configuration commits went straight to `main` on the canary -- the gate
+# fix, the branch point and the merge method -- and `test` and `dev` were left four commits
+# and a materially different profile behind. This route ran in 21 milliseconds and reported
+# `stages-aligned`, which is not "I did not look": it is a positive assertion that every
+# stage carries the content of the ones after it. The belt was switched off precisely under
+# the strategy where the drift then happened.
+#
+# The comparison below is sound under this strategy now, and it is worth saying why it was
+# not obviously so before. It rests on ancestry to narrow the candidates, and under
+# `env-promotion` that only holds if a promotion leaves its snapshot an ancestor of the stage
+# above -- which is exactly what the conventional merge method now guarantees. A profile that
+# squashes or rebases its promotions gets a wider candidate list here, and the patch-id filter
+# below removes the ones already present by content, so the answer stays correct and the run
+# costs a little more.
 
 # Every commit reachable from a ref, as patch-ids. The same code and the same reason as
 # promote-change.sh: a patch-id is the content, so a change that travelled up the chain
