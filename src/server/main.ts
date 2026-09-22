@@ -3,8 +3,10 @@ import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { WebSocketServer } from "ws";
 
-import type { LoopEvent, LoopRun } from "../shared/types.js";
+import type { LoopEvent, LoopRun, Stage } from "../shared/types.js";
 import { listRuns } from "./runs.js";
+import { listStages } from "./stages.js";
+import { readBranchStrategy, readStageBranches } from "./strategy.js";
 import { serveAsset } from "./static.js";
 
 /**
@@ -25,12 +27,43 @@ import { serveAsset } from "./static.js";
 const port = Number(process.env["PORT"] ?? 8787);
 const pollSeconds = Number(process.env["POLL_SECONDS"] ?? 20);
 const webRoot = process.env["WEB_ROOT"] ?? join(dirname(fileURLToPath(import.meta.url)), "..", "..", "dist");
+const repoRoot = join(dirname(fileURLToPath(import.meta.url)), "..", "..");
+// Absent where a deployment ships without .github, which is a config gap worth showing as
+// "unknown" rather than a crashed server.
+const classifyRoutePath = join(repoRoot, ".github", "actions", "classify-route", "classify-route.sh");
+const strategy = ((): string | undefined => {
+  try {
+    return readBranchStrategy(classifyRoutePath);
+  } catch {
+    return undefined;
+  }
+})();
+// One entry under a strategy with no chain, which promotes nothing: `listStages` is asked
+// only where there is a pair of stages for a change to be frozen between.
+const stageBranches = ((): string[] => {
+  try {
+    return readStageBranches(classifyRoutePath) ?? [];
+  } catch {
+    return [];
+  }
+})();
 
 const server = createServer(async (request, response) => {
   if (request.url === "/api/runs") {
     const runs = await listRuns().catch(() => [] as LoopRun[]);
     response.writeHead(200, { "content-type": "application/json" });
     response.end(JSON.stringify(runs));
+    return;
+  }
+  if (request.url === "/api/strategy") {
+    response.writeHead(200, { "content-type": "application/json" });
+    response.end(JSON.stringify({ strategy: strategy ?? null }));
+    return;
+  }
+  if (request.url === "/api/stages") {
+    const stages = stageBranches.length < 2 ? [] : await listStages(stageBranches).catch(() => [] as Stage[]);
+    response.writeHead(200, { "content-type": "application/json" });
+    response.end(JSON.stringify(stages));
     return;
   }
   if (request.url === "/api/health") {

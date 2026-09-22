@@ -1,6 +1,8 @@
 import { useEffect, useMemo, useState, type ReactElement } from "react";
 
-import type { LoopEvent, LoopRun } from "../shared/types.js";
+import { StatusBadge } from "@/components/primitives";
+
+import type { LoopEvent, LoopRun, Stage } from "../shared/types.js";
 import { needsAttention } from "../shared/types.js";
 
 /**
@@ -13,6 +15,8 @@ import { needsAttention } from "../shared/types.js";
 export function App(): ReactElement {
   const [runs, setRuns] = useState<readonly LoopRun[]>([]);
   const [live, setLive] = useState(false);
+  const [strategy, setStrategy] = useState<string | null>(null);
+  const [stages, setStages] = useState<readonly Stage[]>([]);
 
   useEffect(() => {
     const socket = new WebSocket(socketUrl(location));
@@ -27,6 +31,28 @@ export function App(): ReactElement {
     return () => socket.close();
   }, []);
 
+  useEffect(() => {
+    fetch("/api/strategy")
+      .then((response) => response.json() as Promise<{ strategy: string | null }>)
+      .then((body) => setStrategy(body.strategy))
+      .catch(() => setStrategy(null));
+  }, []);
+
+  useEffect(() => {
+    // A frozen stage stays frozen "indefinitely" (the issue that prompted this), so nothing
+    // else on the page is guaranteed to trigger a refetch; a plain interval is what notices
+    // it clearing.
+    const fetchStages = (): void => {
+      fetch("/api/stages")
+        .then((response) => response.json() as Promise<Stage[]>)
+        .then(setStages)
+        .catch(() => setStages([]));
+    };
+    fetchStages();
+    const interval = setInterval(fetchStages, 30_000);
+    return () => clearInterval(interval);
+  }, []);
+
   const ordered = useMemo(() => [...runs].sort(compareRuns), [runs]);
   const waiting = ordered.filter(needsAttention).length;
 
@@ -37,13 +63,49 @@ export function App(): ReactElement {
         <p>
           {live ? "live" : "reconnecting"} · {runs.length} run(s)
           {waiting > 0 ? ` · ${waiting} waiting for a person` : ""}
+          {strategy ? ` · ${strategy}` : ""}
         </p>
       </header>
+      {stages.length > 0 && (
+        <section aria-label="stages">
+          <ol>
+            {stages.map((stage) => (
+              <li key={stage.name} data-frozen={stage.frozen}>
+                <span>{stage.name}</span>
+                {stage.frozen && (
+                  <>
+                    <StatusBadge kind="stage" state="frozen" />
+                    <span>
+                      {stage.blockedBy.map((block, index) => (
+                        <span key={block.issue}>
+                          {index > 0 ? ", " : ""}
+                          <a href={block.url}>#{block.issue}</a> ({block.label})
+                        </span>
+                      ))}
+                    </span>
+                  </>
+                )}
+              </li>
+            ))}
+          </ol>
+        </section>
+      )}
       <ol>
         {ordered.map((run) => (
           <li key={run.id} data-attention={needsAttention(run)}>
             <a href={run.url}>{run.route}</a>
-            <span>{run.subject}</span>
+            {run.carriedIssues === undefined ? (
+              <span>{run.subject}</span>
+            ) : (
+              <span>
+                {run.carriedIssues.map((issue, index) => (
+                  <span key={issue}>
+                    {index > 0 ? ", " : ""}
+                    <a href={issueUrl(run.url, issue)}>#{issue}</a>
+                  </span>
+                ))}
+              </span>
+            )}
             <span>{run.reason}</span>
             <time dateTime={run.startedAt}>{new Date(run.startedAt).toLocaleTimeString()}</time>
           </li>
@@ -66,6 +128,13 @@ export function socketUrl(from: Pick<Location, "protocol" | "host" | "hostname">
   // both, so the page's host is the right answer.
   const host = from.host.includes(":5173") ? `${from.hostname}:8787` : from.host;
   return `${scheme}//${host}/events`;
+}
+
+/** An issue's page on the same repository a run's own `html_url` names, since the server
+ *  never tells the page which repository it is watching. */
+export function issueUrl(runUrl: string, issue: number): string {
+  const match = /^(https:\/\/github\.com\/[^/]+\/[^/]+)\//.exec(runUrl);
+  return match === null ? `#${issue}` : `${match[1]}/issues/${issue}`;
 }
 
 /** Attention first, then unfinished, then newest. */

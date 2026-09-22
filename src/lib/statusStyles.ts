@@ -26,9 +26,7 @@ export interface StatusStyle {
 }
 
 // ---- EXAMPLE domain (delete and replace) --------------------------------
-export type Kind = "job";
 export type JobState = "queued" | "running" | "succeeded" | "failed";
-export type StateValue = JobState;
 
 export const JOB_STYLES: Record<JobState, StatusStyle> = {
   queued: { tone: "neutral", icon: "•", label: "Queued" },
@@ -37,10 +35,25 @@ export const JOB_STYLES: Record<JobState, StatusStyle> = {
   failed: { tone: "err", icon: "✕", label: "Failed" },
 };
 
-/** Resolve a domain (kind, state) pair to its presentation style. */
+// ---- stage: whether a promotion out of it is frozen ---------------------
+export type StageState = "open" | "frozen";
+
+export const STAGE_STYLES: Record<StageState, StatusStyle> = {
+  open: { tone: "neutral", icon: "•", label: "Open" },
+  frozen: { tone: "err", icon: "✕", label: "Frozen" },
+};
+
+export type Kind = "job" | "stage";
+export type StateValue = JobState | StageState;
+
+export function styleFor(kind: "job", state: JobState): StatusStyle;
+export function styleFor(kind: "stage", state: StageState): StatusStyle;
+export function styleFor(kind: Kind, state: StateValue): StatusStyle;
 export function styleFor(kind: Kind, state: StateValue): StatusStyle {
   switch (kind) {
     case "job":
-      return JOB_STYLES[state];
+      return JOB_STYLES[state as JobState];
+    case "stage":
+      return STAGE_STYLES[state as StageState];
   }
 }

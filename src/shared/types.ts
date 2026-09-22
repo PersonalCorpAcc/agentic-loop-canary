@@ -23,6 +23,36 @@ export interface LoopRun {
   readonly finishedAt?: string;
   readonly conclusion?: string;
   readonly url: string;
+  /**
+   * Under `env-promotion` a promotion pull request's head is a snapshot of the stage below,
+   * so it carries every issue that landed there since the last promotion, not just one. When
+   * `subject` names such a pull request, this is every issue its body marks with
+   * `<!-- implement-issue: N -->`, oldest first. Absent for a run whose subject is not a
+   * promotion pull request, so an ordinary row is unchanged.
+   */
+  readonly carriedIssues?: readonly number[];
+}
+
+/** One issue that stops a stage's next promotion, and the label it carries. */
+export interface StageBlock {
+  readonly issue: number;
+  readonly label: string;
+  readonly url: string;
+}
+
+/**
+ * One stage of the installed branching strategy's chain.
+ *
+ * Under `env-promotion` a promotion carries every merged change on a stage as one
+ * all-or-nothing snapshot, so a `hold`, `rollback` or `hotfix` label on any one of them
+ * stops every promotion out of that stage, not just the change it is on. `blockedBy` names
+ * every issue currently doing that; a stage with none is not frozen, and the last stage in
+ * the chain -- which nothing promotes out of -- is never frozen.
+ */
+export interface Stage {
+  readonly name: string;
+  readonly frozen: boolean;
+  readonly blockedBy: readonly StageBlock[];
 }
 
 /** What the server pushes over the socket as runs begin and end. */
