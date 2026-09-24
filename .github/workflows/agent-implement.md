@@ -1,10 +1,10 @@
 ---
-# Managed by @plainconceptsplatform/workflows@0.5.1. Source: loops/workflows/agent-implement.md. Profile digest: b7d3498150a7. Update with `workflows update --force`; consumer edits may be overwritten.
+# Managed by @plainconceptsplatform/workflows@0.5.1. Source: loops/workflows/agent-implement.md. Profile digest: f67d7ff379d7. Update with `workflows update --force`; consumer edits may be overwritten.
 env:
   VERIFY_COMMANDS: "pnpm install --frozen-lockfile && pnpm run build && pnpm run test"
-  REPO_RULES: "Implement only the selected issue. Follow the repository's own documentation and conventions, and do not weaken tests or bypass checks."
+  REPO_RULES: "Install with the lockfile frozen; an install that resolves a different tree is not reproducing the change under review. Run scripts through pnpm rather than npx, or a second package manager's lockfile appears in the diff."
   VERIFY_COMMANDS_SCOPED: "pnpm run typecheck"
-  LINT_FIX_COMMAND: ""
+  LINT_FIX_COMMAND: "pnpm run lint --fix"
   PLAN_RUN_SKILL: plan-run
   PLAN_RUN_COMMAND: plan-run
   PLAN_EXPLORE_SKILL: plan-explore
@@ -40,6 +40,13 @@ env:
   REFUSAL_SIGNATURE: "billing_error|credit balance is too low"
   INCOMPLETE_COMMENT: "Automated implementation ran and ended without an outcome. The issue is released and flagged for review: a run that got this far and still failed will fail the same way again."
   ISSUE_CONTEXT_PATH: /tmp/gh-aw/agent/implementation-context.json
+  # The kit resolves a commit identity from `git config` first and from this second, and
+  # inside the agent's container there is no git configuration: the one the runner writes
+  # belongs to the host. Without this the pipeline stops at its own preconditions with
+  # `identity-missing` before it writes anything, and the run costs a runner and produces
+  # nothing (004 FR-009, 004 research R1). `Name <email>`, carrying the same identity as
+  # the GIT_AUTHOR_ values above, because one commit cannot have two authors.
+  HARNESS_GIT_IDENTITY: "github-actions[bot] <github-actions[bot]@users.noreply.github.com>"
   # The branch a pull request opens against, which under a chain is not the branch the
   # work was cut from. Projected, and a token so that a profile that cannot fill it fails
   # the install rather than shipping the word "main" to somebody else (FR-025).
@@ -247,6 +254,8 @@ jobs:
       contents: read
       issues: write
       pull-requests: write
+      # To read the agent job's log, which is where the kit's outcome line is.
+      actions: read
     steps:
       - name: Checkout workflow actions
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -346,15 +355,60 @@ jobs:
           sleep 60
           gh workflow run work-router.yml --repo "$REPO" --ref "$REF" \
             -f operation=reconcile-bot-pr-runs
+      # The kit ends its report with one machine-readable line and nothing carries it out
+      # of the container: `report_incomplete` has no output on the safe-outputs job, so the
+      # agent job's own log is the only place the reason survives. This is the same read
+      # the retry decision makes for a billing refusal, for the same reason.
+      #
+      # The pattern demands real values and the last match wins, because the prompt shows
+      # the line's shape and the prompt is printed into this same log: `phase=<...>` does
+      # not match `phase=[a-z]+`, so the template cannot be mistaken for an answer.
+      - name: Read the pipeline's outcome line
+        id: pipeline
+        if: needs.safe_outputs.outputs.created_pr_number == ''
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          RUN_ID: ${{ github.run_id }}
+        run: |
+          set -euo pipefail
+          # A called workflow shares the caller's run id, so the agent job is in this run.
+          job_id=$(gh api "repos/$REPO/actions/runs/$RUN_ID/jobs?per_page=100" \
+            --jq '[.jobs[] | select(.name | endswith("agent"))] | last | .id // empty')
+          line=""
+          if [ -n "${job_id:-}" ]; then
+            line=$(gh api "repos/$REPO/actions/jobs/${job_id}/logs" 2>/dev/null |
+              grep -oE 'outcome=(succeeded|failed|refused) phase=[a-z]+ change=[^ ]+ commits=[0-9]+ reason=[a-z-]+' |
+              tail -n 1 || true)
+          fi
+          outcome=""
+          phase=""
+          reason=""
+          declined=false
+          if [ -n "$line" ]; then
+            outcome="${line#outcome=}"
+            outcome="${outcome%% *}"
+            phase="${line#*phase=}"
+            phase="${phase%% *}"
+            reason="${line##*reason=}"
+            [ "$outcome" = succeeded ] || declined=true
+          fi
+          {
+            echo "outcome=${outcome}"
+            echo "phase=${phase}"
+            echo "reason=${reason}"
+            echo "declined=${declined}"
+          } >> "$GITHUB_OUTPUT"
+          echo "The pipeline's outcome line: ${line:-<none printed>}"
       - name: Record the outcome
         if: always()
         uses: ./.github/actions/record-outcome
         with:
-          outcome: ${{ needs.safe_outputs.outputs.created_pr_number != '' && 'acted' || 'no-action' }}
-          reason: ${{ needs.safe_outputs.outputs.created_pr_number != '' && 'acted' || 'no-eligible-change' }}
+          outcome: ${{ needs.safe_outputs.outputs.created_pr_number != '' && 'acted' || steps.pipeline.outputs.declined == 'true' && 'handed-to-human' || 'no-action' }}
+          reason: ${{ needs.safe_outputs.outputs.created_pr_number != '' && 'acted' || steps.pipeline.outputs.declined == 'true' && 'pipeline-declined' || 'no-eligible-change' }}
           route: implement
           subject: ${{ format('#{0}', inputs.issue-number) }}
-          detail: "${{ needs.safe_outputs.outputs.created_pr_number != '' && format('Opened pull request #{0} for this issue.', needs.safe_outputs.outputs.created_pr_number) || 'The run produced no pull request for this issue.' }}"
+          detail: "${{ needs.safe_outputs.outputs.created_pr_number != '' && format('Opened pull request #{0} for this issue.', needs.safe_outputs.outputs.created_pr_number) || steps.pipeline.outputs.declined == 'true' && format('The pipeline stopped: {0} in phase {1}, reason {2}. No pull request was requested.', steps.pipeline.outputs.outcome, steps.pipeline.outputs.phase, steps.pipeline.outputs.reason) || 'The run produced no pull request for this issue.' }}"
   incomplete:
     needs: [agent, safe_outputs, eligibility]
     if: >
@@ -545,6 +599,26 @@ steps:
       issue-number: ${{ inputs.issue-number }}
       output-path: ${{ env.ISSUE_CONTEXT_PATH }}
 
+# The pipeline refuses to start without its specification tool, and it is right to: every phase
+# after exploration writes through it. It used to arrive only through the OpenCode engine's own
+# import, so under any other engine the tool was never there, and the kit's precondition stopped
+# every standard-path run with `missing-tool` before it wrote a line -- observed on the first
+# Claude Code run of the unattended mode, 24/09/2026. This worker is the only one whose
+# capabilities call the tool, so it installs it itself, on the host before the agent starts:
+# a global install under the runner's Node lands on a path the agent's container can read.
+# Pinned to the version the OpenCode import pins, and skipped when that import has already run
+# (FR-088, research R16).
+pre-agent-steps:
+  - name: Install the specification tool the pipeline requires
+    run: |
+      set -euo pipefail
+      if command -v openspec > /dev/null 2>&1 && openspec --version 2>/dev/null | grep -q "1.8.0"; then
+        echo "openspec 1.8.0 already installed"
+        exit 0
+      fi
+      npm install -g "@fission-ai/openspec@1.8.0"
+      openspec --version
+
 safe-outputs:
   # A failed run is already visible as a red run. An issue per failure buries the
   # real backlog under noise that nobody closes.
@@ -633,41 +707,79 @@ timeout-minutes: 90
 
    **If the trivial marker is absent (standard path):**
 
-   Follow the `/${{ env.PLAN_RUN_COMMAND }}` pipeline end-to-end. Do not create ad-hoc todo lists or
-   manually orchestrate implementation steps. Instead:
+   Run the pipeline capability once, in its unattended mode, and let it own the work:
 
-   a. Load the `${{ env.PLAN_RUN_SKILL }}` skill. It defines a mandatory, gate-sequenced pipeline:
-      `explore · propose · apply · verify · archive · output · report`
+   ```
+   /${{ env.PLAN_RUN_COMMAND }} unattended ${{ env.ISSUE_CONTEXT_PATH }}
+   ```
 
-   b. **Refined-issue fast path:** If the issue context at `${{ env.ISSUE_CONTEXT_PATH }}`
+   Do not create ad-hoc todo lists and do not orchestrate its phases yourself.
+
+   a. **The mode token is mandatory and it comes first.** Without it the pipeline sees `CI`
+      set, refuses before it writes anything, and this run costs a runner and produces
+      nothing. That refusal is deliberate and it is on your side: the pipeline's other modes
+      switch branches, stash, pull, merge and push, and this sandbox has no credentials for
+      any of that. What follows the token is the input, and a readable file path is read as
+      the input, so pass the path rather than pasting the issue: the pipeline opens the file
+      itself.
+
+   b. Unattended, the pipeline works on the current HEAD only. It creates, switches and
+      deletes no branch, and everything it commits stays on HEAD for this workflow to
+      publish. Do not commit its work a second time and do not move it anywhere.
+
+   c. It is a mandatory, gate-sequenced pipeline:
+      `explore · propose · apply · verify · archive · output · report`, and the
+      `${{ env.PLAN_RUN_SKILL }}` skill is where that sequence is written.
+
+   d. **Refined-issue fast path:** If the issue context at `${{ env.ISSUE_CONTEXT_PATH }}`
       already contains structured acceptance criteria (e.g. "## Acceptance criteria",
       "### Scenario:", Gherkin blocks), affected artifacts, and design decisions, the
       `${{ env.PLAN_RUN_SKILL }}` skill will skip the explore and propose phases and go directly to
       apply. Do not override this: re-exploring a pre-refined issue wastes tokens.
 
-   c. Execute every phase in order. Each phase loads its own sub-skill (`${{ env.PLAN_EXPLORE_SKILL }}`,
+   e. Execute every phase in order. Each phase loads its own sub-skill (`${{ env.PLAN_EXPLORE_SKILL }}`,
       `${{ env.PLAN_PROPOSE_SKILL }}`, `${{ env.PLAN_IMPLEMENT_SKILL }}`, `${{ env.REPO_VERIFY_SKILL }}`, `${{ env.PLAN_ARCHIVE_SKILL }}`)
       and owns its procedure. You must not skip a phase unless the
       pipeline's refined-issue detection says to.
 
-    d. The implement phase uses `${{ env.PLAN_IMPLEMENT_SKILL }}` which delegates implementation to specialist
+    f. The implement phase uses `${{ env.PLAN_IMPLEMENT_SKILL }}` which delegates implementation to specialist
        subagent waves. Let it own worker resolution, concurrency, and retry , do not
        implement the tasks yourself unless `${{ env.PLAN_IMPLEMENT_SKILL }}` instructs you to.
 
-    e. Implement only what the issue asks for: a vague sentence is not licence to redesign
+    g. Implement only what the issue asks for: a vague sentence is not licence to redesign
        a module. Never read outside this repository root. The issue context at
        `${{ env.ISSUE_CONTEXT_PATH }}` defines acceptance criteria that the pipeline must
        satisfy.
 
-    g. Follow repository documentation and established conventions. Keep changes focused,
+    h. Follow repository documentation and established conventions. Keep changes focused,
        protect secrets, do not bypass checks, and do not modify generated files unless the issue requires it.
        Adhere to ${{ env.REPO_RULES }}.
 
-    h. **DECISIVE IMPLEMENTATION.** When a design choice is ambiguous, pick the most
+    i. **DECISIVE IMPLEMENTATION.** When a design choice is ambiguous, pick the most
       standard interpretation and implement it immediately. Do not deliberate between
       options for more than one turn. Do not ask clarifying questions — the issue author
       expects you to use good judgment. If two approaches are equally valid, pick one and
       proceed. You can always iterate based on PR feedback.
+
+    j. **The pipeline's last line is its answer, and you must read it.** Its report ends
+      with exactly one machine-readable line, in this shape:
+
+      ```
+      outcome=<succeeded|failed|refused> phase=<...> change=<id|none> commits=<n> reason=<token|->
+      ```
+
+      - `succeeded`: go on to step 4 and verify.
+      - `failed` or `refused`: **stop.** Do not create a pull request and do not push to
+        one. `refused` means nothing was written at all; `failed` means what was written
+        did not pass the pipeline's own gates, and a pull request for it would put work
+        the pipeline rejected in front of the merge gate as though it were finished.
+        Call `safeoutputs/report_incomplete`, and begin your `reason` with the pipeline's
+        own token exactly as it printed it, then the phase it stopped in and one sentence
+        from its report. This run's own outcome line quotes that token, so whoever reads
+        the run learns what the pipeline decided rather than that no pull request
+        appeared.
+      - No line at all is `failed` with the reason `state-inconsistent`, and is reported
+        the same way: a run that ended without its line did not finish.
 
 4. Verify before you conclude. From the repository root:
 
@@ -744,7 +856,9 @@ timeout-minutes: 90
         when step 5 found an open bot PR for this issue. Do not create a duplicate PR.
       - **`safeoutputs/report_incomplete`** , use only when infrastructure or tooling
       prevents you from completing the task (e.g. the codebase cannot build due to a
-      pre-existing error you cannot fix). Provide a specific `reason`.
+      pre-existing error you cannot fix). Provide a specific `reason`. This is also the
+      answer when the pipeline ended `failed` or `refused` (step 3j), and there its own
+      token goes first in the `reason`.
     - **`safeoutputs/noop`** , use only when the issue context shows the work is already
       done and no changes are needed. Provide a `message` explaining what you found.
 
@@ -770,14 +884,16 @@ flowchart TD
     implCheck -->|yes: trivial| implTodos
     implCheck -->|no: standard| implCode
     implTodos("Trivial path<br/>todos from checklist,<br/>implement directly") -->|✓| implVerify
-    implCode["Standard path<br/>/${{ env.PLAN_RUN_COMMAND }} pipeline"] -->|✓| implVerify
+    implCode["Standard path<br/>/${{ env.PLAN_RUN_COMMAND }} unattended"] -->|✓| implVerify
     implCode -.->|too unclear| implUnclear
+    implCode -.->|failed or refused| implDeclined
     implVerify["Verify<br/>lint, typecheck, tests, build<br/>↻"] -->|✓| implPr
     implVerify -.->|✗| implCode
     implPr("PR<br/>Against ${{ env.BASE_BRANCH }}, linked to #N") -->|✓| implHandoff
     implPr -.->|✗| implFail
     implHandoff(("Handed off<br/>bot-working removed, gate decides"))
     implUnclear(("Unclear<br/>review added, detail requested"))
+    implDeclined(("Declined<br/>no pull request, kit's reason recorded"))
     implIdle(("Idle<br/>No eligible issue"))
     implFail(("Fail<br/>review added, implement removed"))
 
@@ -790,7 +906,7 @@ flowchart TD
     class implStart start
     class implReserve,implFacts,implTodos,implPr action
     class implPick,implCode,implVerify,implCheck decision
-    class implIdle,implUnclear idle
+    class implIdle,implUnclear,implDeclined idle
     class implFail failure
     class implHandoff success
 ```

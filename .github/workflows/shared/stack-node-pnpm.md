@@ -1,5 +1,14 @@
 ---
-# Managed by @plainconceptsplatform/workflows@0.5.1. Source: loops/stacks/node-pnpm/pack.yml. Profile digest: b7d3498150a7. Update with `workflows update --force`; consumer edits may be overwritten.
+# Managed by @plainconceptsplatform/workflows@0.5.1. Source: loops/stacks/node-pnpm/pack.yml. Profile digest: f67d7ff379d7. Update with `workflows update --force`; consumer edits may be overwritten.
+network:
+  allowed:
+    - defaults
+    - node
+pre-agent-steps:
+  - name: Set up pnpm
+    uses: pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413
+  - name: Set up Node for pnpm
+    uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020
 ---
 
 Setup for the node-pnpm toolchain. Ecosystem facts only: this file carries no
