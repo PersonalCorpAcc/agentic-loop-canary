@@ -1,11 +1,11 @@
 ---
-# Managed by @plainconceptsplatform/workflows@0.5.1. Source: loops/workflows/agent-merge-gate.md. Profile digest: b7d3498150a7. Update with `workflows update --force`; consumer edits may be overwritten.
+# Managed by @plainconceptsplatform/workflows@0.5.1. Source: loops/workflows/agent-merge-gate.md. Profile digest: f67d7ff379d7. Update with `workflows update --force`; consumer edits may be overwritten.
 env:
   VERIFY_COMMANDS: "pnpm install --frozen-lockfile && pnpm run build && pnpm run test"
-  REPO_RULES: "Make a risk-based merge decision for the selected bot pull request. Merge only when CI is green and no risk indicators are present. Review risk indicators defined in the repository's guardrails or project documentation. Any of these require human review. Do not merge protected file changes."
-  PROTECTED_FILES: (^\.|^opencode\.jsonc$|^package\.json$|^pnpm-lock\.yaml$|^AGENTS\.md$|^ARCHITECTURE\.md$)
+  REPO_RULES: "Install with the lockfile frozen; an install that resolves a different tree is not reproducing the change under review. Run scripts through pnpm rather than npx, or a second package manager's lockfile appears in the diff."
+  PROTECTED_FILES: (^\.|^opencode\.jsonc$|^package\.json$|^pnpm-lock\.yaml$|^pnpm-workspace\.yaml$|^AGENTS\.md$|^ARCHITECTURE\.md$)
   VERIFY_COMMANDS_SCOPED: "pnpm run typecheck"
-  LINT_FIX_COMMAND: ""
+  LINT_FIX_COMMAND: "pnpm run lint --fix"
   REPO_VERIFY_COMMAND: repo-verify
   WORKING_LABEL: bot-working
   IMPLEMENT_LABEL: implement
