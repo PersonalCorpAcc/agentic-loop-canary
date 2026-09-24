@@ -1,0 +1,96 @@
+# A probe, not part of the loop. Delete it once T142 is recorded.
+#
+# FR-069 says a pull request opened with the workflow token does not start workflows for the
+# events it raises, and requires that to be *observed* on a protected branch rather than
+# assumed. Everything downstream leans on it: the gate waits for a CI conclusion, the
+# reconcile belt escalates when no run appears, and the App token is used for exactly those
+# writes that must start a run. If the assumption were wrong in either direction the loop
+# would either hang for ever or be paying for an App token it does not need.
+#
+# So: open the same pull request twice, once with each token, and look at what CI does.
+name: Probe - does a token's pull request start CI
+
+on:
+  workflow_dispatch:
+    inputs:
+      token:
+        description: Which credential opens the pull request
+        required: true
+        type: choice
+        options: [workflow, app]
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  probe:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Mint an App token
+        if: inputs.token == 'app'
+        id: app-token
+        uses: actions/create-github-app-token@df432ceedc7162793a195dd1713ff69aefc7379e # v2.0.6
+        with:
+          app-id: ${{ secrets.BOT_APP_ID }}
+          private-key: ${{ secrets.BOT_PRIVATE_KEY }}
+
+      - name: Open a pull request with the chosen credential
+        id: open
+        env:
+          # The whole experiment is this line: the same steps, a different credential.
+          GH_TOKEN: ${{ inputs.token == 'app' && steps.app-token.outputs.token || github.token }}
+          REPO: ${{ github.repository }}
+          KIND: ${{ inputs.token }}
+        run: |
+          set -euo pipefail
+          branch="probe/${KIND}-token-${GITHUB_RUN_ID}"
+          git config user.name "probe"
+          git config user.email "probe@users.noreply.github.com"
+          git switch -c "$branch"
+          printf 'probe %s %s\n' "$KIND" "$GITHUB_RUN_ID" > probe-token.txt
+          git add probe-token.txt
+          git commit -qm "probe: ${KIND} token opens a pull request"
+
+          # Pushed with the same credential that opens the pull request, because the push is
+          # half the question: `push` events are subject to the same rule as `pull_request`.
+          git -c http.extraheader="Authorization: Basic $(printf 'x-access-token:%s' "$GH_TOKEN" | base64 -w0)" \
+            push -q origin "HEAD:refs/heads/${branch}"
+
+          number="$(gh pr create --repo "$REPO" --base main --head "$branch" \
+            --title "[probe] ${KIND} token opens a pull request" \
+            --body "FR-069 probe. Opened with the **${KIND}** token. The question is whether a CI run appears on this head at all; nothing here is meant to merge." |
+            grep -oE '[0-9]+$')"
+          echo "number=${number}" >> "$GITHUB_OUTPUT"
+          echo "branch=${branch}" >> "$GITHUB_OUTPUT"
+          echo "Opened #${number} on ${branch} with the ${KIND} token."
+
+      - name: Wait, then report what CI did
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          PR: ${{ steps.open.outputs.number }}
+          KIND: ${{ inputs.token }}
+        run: |
+          set -euo pipefail
+          # Long enough for a run to have been created, which is the question. Whether it has
+          # finished does not matter: FR-069 is about a run existing at all.
+          sleep 60
+          head="$(gh pr view "$PR" --repo "$REPO" --json headRefOid --jq .headRefOid)"
+          runs="$(gh api "repos/${REPO}/commits/${head}/check-runs?per_page=100" --jq '.check_runs | length')"
+          names="$(gh api "repos/${REPO}/commits/${head}/check-runs?per_page=100" --jq '[.check_runs[].name] | join(", ")')"
+
+          {
+            echo "## FR-069 probe: the ${KIND} token"
+            echo
+            echo "- pull request: #${PR}"
+            echo "- head: \`${head}\`"
+            echo "- check runs on that head: **${runs}**"
+            echo "- names: ${names:-(none)}"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+          echo "::notice::${KIND} token -> ${runs} check run(s) on the pull request head: ${names:-none}"
