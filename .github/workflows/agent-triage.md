@@ -1,7 +1,7 @@
 ---
-# Managed by @plainconceptsplatform/workflows@0.5.1. Source: loops/workflows/agent-triage.md. Profile digest: b7d3498150a7. Update with `workflows update --force`; consumer edits may be overwritten.
+# Managed by @plainconceptsplatform/workflows@0.5.1. Source: loops/workflows/agent-triage.md. Profile digest: f67d7ff379d7. Update with `workflows update --force`; consumer edits may be overwritten.
 env:
-  REPO_RULES: "Triage issues opened by outside collaborators. Assess template completeness, security risk, change size, danger level, duplicates, clarity, reproducibility, acceptance criteria, and cross-cutting impact. Do not implement code. Do not modify the issue body."
+  REPO_RULES: "Install with the lockfile frozen; an install that resolves a different tree is not reproducing the change under review. Run scripts through pnpm rather than npx, or a second package manager's lockfile appears in the diff."
   TRIAGE_LABEL: triage
   WORKING_LABEL: bot-working
   REVIEW_LABEL: review
