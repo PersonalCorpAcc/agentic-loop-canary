@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Managed by @plainconceptsplatform/workflows@0.5.1. Source: loops/actions/record-outcome/record-outcome.sh. Profile digest: b7d3498150a7. Update with `workflows update --force`; consumer edits may be overwritten.
+# Managed by @plainconceptsplatform/workflows@0.5.1. Source: loops/actions/record-outcome/record-outcome.sh. Profile digest: f67d7ff379d7. Update with `workflows update --force`; consumer edits may be overwritten.
 #
 # One line per job saying what happened and why (FR-058).
 #
@@ -53,6 +53,11 @@ readonly REASONS=(
   # A human is needed, or the machinery could not proceed.
   conflict-handed-off
   review-requested
+  # The implementing worker asked the kit for the whole change and the kit declined:
+  # refused before it wrote anything, or failed its own gates after. Its reason token
+  # is its own vocabulary and belongs in the detail sentence, not in this set -- what
+  # this loop did is the same either way, which is hand the issue back.
+  pipeline-declined
   budget-exhausted
   egress-blocked
   runner-offline

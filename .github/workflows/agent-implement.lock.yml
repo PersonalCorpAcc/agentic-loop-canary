@@ -1,5 +1,5 @@
-# gh-aw-metadata: {"schema_version":"v4","frontmatter_hash":"2f2d3bd8271cdd9076d382d9d970bab68bcd8852ebfe1b61e2346b1a23c9ea7f","body_hash":"c384c2bc484feb9b4921a1c54662934b142cd28fcdea94b53ae412d94f769c7e","compiler_version":"v0.87.5","strict":true,"agent_id":"claude","agent_model":"claude-sonnet-5","engine_versions":{"claude":"2.1.237"},"agent_image_runner":"ubuntu-24.04"}
-# gh-aw-manifest: {"version":1,"secrets":["ANTHROPIC_API_KEY","BOT_APP_ID","BOT_PRIVATE_KEY","COPILOT_GITHUB_TOKEN","GH_AW_CI_TRIGGER_TOKEN","GH_AW_GITHUB_MCP_SERVER_TOKEN","GH_AW_GITHUB_TOKEN","GITHUB_TOKEN"],"actions":[{"repo":"actions/cache/restore","sha":"55cc8345863c7cc4c66a329aec7e433d2d1c52a9","version":"v6.1.0"},{"repo":"actions/cache/save","sha":"55cc8345863c7cc4c66a329aec7e433d2d1c52a9","version":"v6.1.0"},{"repo":"actions/checkout","sha":"3d3c42e5aac5ba805825da76410c181273ba90b1","version":"v7.0.1"},{"repo":"actions/create-github-app-token","sha":"bcd2ba49218906704ab6c1aa796996da409d3eb1","version":"v3.2.0"},{"repo":"actions/download-artifact","sha":"3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c","version":"v8.0.1"},{"repo":"actions/github-script","sha":"3a2844b7e9c422d3c10d287c895573f7108da1b3","version":"v9.0.0"},{"repo":"actions/setup-node","sha":"820762786026740c76f36085b0efc47a31fe5020","version":"v7.0.0"},{"repo":"actions/upload-artifact","sha":"043fb46d1a93c77aae656e7c1c64a875d1fc6a0a","version":"v7.0.1"},{"repo":"github/gh-aw-actions/setup","sha":"2a78d04403fdc6907d0f05327cffac9dbad5312d","version":"v0.87.5"}],"containers":[{"image":"ghcr.io/github/gh-aw-firewall/agent:0.28.7","digest":"sha256:40a1e30b1b8d70642d4292485146cd5af612730d7a6a2e12706ddd13df375059","pinned_image":"ghcr.io/github/gh-aw-firewall/agent:0.28.7@sha256:40a1e30b1b8d70642d4292485146cd5af612730d7a6a2e12706ddd13df375059"},{"image":"ghcr.io/github/gh-aw-firewall/api-proxy:0.28.7","digest":"sha256:4f209dd4cbc74d47a6c7379956143de293429d1b1b2fb2647776cdcbf65836a1","pinned_image":"ghcr.io/github/gh-aw-firewall/api-proxy:0.28.7@sha256:4f209dd4cbc74d47a6c7379956143de293429d1b1b2fb2647776cdcbf65836a1"},{"image":"ghcr.io/github/gh-aw-firewall/squid:0.28.7","digest":"sha256:fb362a08d4d2f0da6c036e3f5d3b2fd87931e857fec3ca4a241cd2f2b61131f9","pinned_image":"ghcr.io/github/gh-aw-firewall/squid:0.28.7@sha256:fb362a08d4d2f0da6c036e3f5d3b2fd87931e857fec3ca4a241cd2f2b61131f9"},{"image":"ghcr.io/github/gh-aw-mcpg:v0.4.10","digest":"sha256:08bb5fa417aed94b40a14e2b7b3ae457531a5f22b143a32fe58317139d9b8f42","pinned_image":"ghcr.io/github/gh-aw-mcpg:v0.4.10@sha256:08bb5fa417aed94b40a14e2b7b3ae457531a5f22b143a32fe58317139d9b8f42"},{"image":"ghcr.io/github/gh-aw-node","digest":"sha256:bac2192f6374d6262116399b34fc5e143d576f82719e90a18261cae7480f4d4e","pinned_image":"ghcr.io/github/gh-aw-node@sha256:bac2192f6374d6262116399b34fc5e143d576f82719e90a18261cae7480f4d4e"},{"image":"ghcr.io/github/github-mcp-server:v1.10.0","digest":"sha256:097512ddf58af80a620c177ae9cad93448f9a2a55c70ee8fde5cec6714522a8c","pinned_image":"ghcr.io/github/github-mcp-server:v1.10.0@sha256:097512ddf58af80a620c177ae9cad93448f9a2a55c70ee8fde5cec6714522a8c"}],"mcp_servers":[{"name":"github","tools":["get_commit","get_file_contents","get_latest_release","get_me","get_pull_request","get_pull_request_comments","get_pull_request_diff","get_pull_request_files","get_pull_request_review_comments","get_pull_request_reviews","get_pull_request_status","get_release_by_tag","get_tag","issue_read","list_branches","list_commits","list_issue_types","list_issues","list_pull_requests","list_releases","list_starred_repositories","list_tags","pull_request_read","search_code","search_issues","search_pull_requests","search_repositories"]},{"name":"safeoutputs","tools":["create_pull_request","missing_data","missing_tool","noop","push_to_pull_request_branch"]}]}
+# gh-aw-metadata: {"schema_version":"v4","frontmatter_hash":"4aa91bb43f34c2de54da2028f70cba120964468f69d0248a3e713e258118e1f4","body_hash":"c5d6ca88abaf95a4d68cb9d2f125201e860b47bb242909e595aff76cd3a3d334","compiler_version":"v0.87.5","strict":true,"agent_id":"claude","agent_model":"claude-sonnet-5","engine_versions":{"claude":"2.1.237"},"agent_image_runner":"ubuntu-24.04"}
+# gh-aw-manifest: {"version":1,"secrets":["ANTHROPIC_API_KEY","BOT_APP_ID","BOT_PRIVATE_KEY","COPILOT_GITHUB_TOKEN","GH_AW_CI_TRIGGER_TOKEN","GH_AW_GITHUB_MCP_SERVER_TOKEN","GH_AW_GITHUB_TOKEN","GITHUB_TOKEN"],"actions":[{"repo":"actions/cache/restore","sha":"55cc8345863c7cc4c66a329aec7e433d2d1c52a9","version":"v6.1.0"},{"repo":"actions/cache/save","sha":"55cc8345863c7cc4c66a329aec7e433d2d1c52a9","version":"v6.1.0"},{"repo":"actions/checkout","sha":"3d3c42e5aac5ba805825da76410c181273ba90b1","version":"v7.0.1"},{"repo":"actions/create-github-app-token","sha":"bcd2ba49218906704ab6c1aa796996da409d3eb1","version":"v3.2.0"},{"repo":"actions/download-artifact","sha":"3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c","version":"v8.0.1"},{"repo":"actions/github-script","sha":"3a2844b7e9c422d3c10d287c895573f7108da1b3","version":"v9.0.0"},{"repo":"actions/setup-node","sha":"820762786026740c76f36085b0efc47a31fe5020","version":"v7.0.0"},{"repo":"actions/upload-artifact","sha":"043fb46d1a93c77aae656e7c1c64a875d1fc6a0a","version":"v7.0.1"},{"repo":"github/gh-aw-actions/setup","sha":"2a78d04403fdc6907d0f05327cffac9dbad5312d","version":"v0.87.5"},{"repo":"pnpm/action-setup","sha":"ea17c68df8912ef543352723c149a84f56e3d413","version":"ea17c68df8912ef543352723c149a84f56e3d413"}],"containers":[{"image":"ghcr.io/github/gh-aw-firewall/agent:0.28.7","digest":"sha256:40a1e30b1b8d70642d4292485146cd5af612730d7a6a2e12706ddd13df375059","pinned_image":"ghcr.io/github/gh-aw-firewall/agent:0.28.7@sha256:40a1e30b1b8d70642d4292485146cd5af612730d7a6a2e12706ddd13df375059"},{"image":"ghcr.io/github/gh-aw-firewall/api-proxy:0.28.7","digest":"sha256:4f209dd4cbc74d47a6c7379956143de293429d1b1b2fb2647776cdcbf65836a1","pinned_image":"ghcr.io/github/gh-aw-firewall/api-proxy:0.28.7@sha256:4f209dd4cbc74d47a6c7379956143de293429d1b1b2fb2647776cdcbf65836a1"},{"image":"ghcr.io/github/gh-aw-firewall/squid:0.28.7","digest":"sha256:fb362a08d4d2f0da6c036e3f5d3b2fd87931e857fec3ca4a241cd2f2b61131f9","pinned_image":"ghcr.io/github/gh-aw-firewall/squid:0.28.7@sha256:fb362a08d4d2f0da6c036e3f5d3b2fd87931e857fec3ca4a241cd2f2b61131f9"},{"image":"ghcr.io/github/gh-aw-mcpg:v0.4.10","digest":"sha256:08bb5fa417aed94b40a14e2b7b3ae457531a5f22b143a32fe58317139d9b8f42","pinned_image":"ghcr.io/github/gh-aw-mcpg:v0.4.10@sha256:08bb5fa417aed94b40a14e2b7b3ae457531a5f22b143a32fe58317139d9b8f42"},{"image":"ghcr.io/github/gh-aw-node","digest":"sha256:bac2192f6374d6262116399b34fc5e143d576f82719e90a18261cae7480f4d4e","pinned_image":"ghcr.io/github/gh-aw-node@sha256:bac2192f6374d6262116399b34fc5e143d576f82719e90a18261cae7480f4d4e"},{"image":"ghcr.io/github/github-mcp-server:v1.10.0","digest":"sha256:097512ddf58af80a620c177ae9cad93448f9a2a55c70ee8fde5cec6714522a8c","pinned_image":"ghcr.io/github/github-mcp-server:v1.10.0@sha256:097512ddf58af80a620c177ae9cad93448f9a2a55c70ee8fde5cec6714522a8c"}],"mcp_servers":[{"name":"github","tools":["get_commit","get_file_contents","get_latest_release","get_me","get_pull_request","get_pull_request_comments","get_pull_request_diff","get_pull_request_files","get_pull_request_review_comments","get_pull_request_reviews","get_pull_request_status","get_release_by_tag","get_tag","issue_read","list_branches","list_commits","list_issue_types","list_issues","list_pull_requests","list_releases","list_starred_repositories","list_tags","pull_request_read","search_code","search_issues","search_pull_requests","search_repositories"]},{"name":"safeoutputs","tools":["create_pull_request","missing_data","missing_tool","noop","push_to_pull_request_branch"]}]}
 # This file was automatically generated by gh-aw (v0.87.5). DO NOT EDIT. To debug this workflow, load the skill at https://github.com/github/gh-aw/blob/main/debug.md
 # post-processed by scripts/compile-agent-workflows.mjs; run it again and nothing changes
 #
@@ -48,6 +48,7 @@
 #   - GIT_AUTHOR_NAME: (main workflow)
 #   - GIT_COMMITTER_EMAIL: (main workflow)
 #   - GIT_COMMITTER_NAME: (main workflow)
+#   - HARNESS_GIT_IDENTITY: (main workflow)
 #   - IMPLEMENT_LABEL: (main workflow)
 #   - IMPLEMENT_MARKER: (main workflow)
 #   - INCOMPLETE_COMMENT: (main workflow)
@@ -92,6 +93,7 @@
 #   - actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
 #   - actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
 #   - github/gh-aw-actions/setup@2a78d04403fdc6907d0f05327cffac9dbad5312d # v0.87.5
+#   - pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413 # ea17c68df8912ef543352723c149a84f56e3d413
 #
 # Container images used:
 #   - ghcr.io/github/gh-aw-firewall/agent:0.28.7@sha256:40a1e30b1b8d70642d4292485146cd5af612730d7a6a2e12706ddd13df375059
@@ -165,11 +167,12 @@ env:
   GIT_AUTHOR_NAME: github-actions[bot]
   GIT_COMMITTER_EMAIL: github-actions[bot]@users.noreply.github.com
   GIT_COMMITTER_NAME: github-actions[bot]
+  HARNESS_GIT_IDENTITY: github-actions[bot] <github-actions[bot]@users.noreply.github.com>
   IMPLEMENT_LABEL: implement
   IMPLEMENT_MARKER: "<!-- agent-implement -->"
   INCOMPLETE_COMMENT: "Automated implementation ran and ended without an outcome. The issue is released and flagged for review: a run that got this far and still failed will fail the same way again."
   ISSUE_CONTEXT_PATH: /tmp/gh-aw/agent/implementation-context.json
-  LINT_FIX_COMMAND: ""
+  LINT_FIX_COMMAND: pnpm run lint --fix
   MAX_ATTEMPTS: "5"
   PARK_AT_ATTEMPT: "4"
   PLAN_ARCHIVE_SKILL: plan-archive
@@ -180,7 +183,7 @@ env:
   PLAN_RUN_SKILL: plan-run
   PR_PENDING_LABEL: pr-pending
   REFUSAL_SIGNATURE: billing_error|credit balance is too low
-  REPO_RULES: Implement only the selected issue. Follow the repository's own documentation and conventions, and do not weaken tests or bypass checks.
+  REPO_RULES: Install with the lockfile frozen; an install that resolves a different tree is not reproducing the change under review. Run scripts through pnpm rather than npx, or a second package manager's lockfile appears in the diff.
   REPO_VERIFY_SKILL: repo-verify
   RETRY_UNDER_MINUTES: "6"
   REVIEW_LABEL: review
@@ -737,6 +740,20 @@ jobs:
         env:
           GH_AW_SKILL_DIR: ".claude/skills"
         run: bash "${RUNNER_TEMP}/gh-aw/actions/restore_inline_skills.sh"
+      - name: Set up pnpm
+        uses: pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413 # ea17c68df8912ef543352723c149a84f56e3d413
+      - name: Set up Node for pnpm
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+      - name: Install the specification tool the pipeline requires
+        run: |-
+          set -euo pipefail
+          if command -v openspec > /dev/null 2>&1 && openspec --version 2>/dev/null | grep -q "1.8.0"; then
+            echo "openspec 1.8.0 already installed"
+            exit 0
+          fi
+          npm install -g "@fission-ai/openspec@1.8.0"
+          openspec --version
+
       - name: Download container images
         run: bash "${RUNNER_TEMP}/gh-aw/actions/download_docker_images.sh" ghcr.io/github/gh-aw-firewall/agent:0.28.7@sha256:40a1e30b1b8d70642d4292485146cd5af612730d7a6a2e12706ddd13df375059 ghcr.io/github/gh-aw-firewall/api-proxy:0.28.7@sha256:4f209dd4cbc74d47a6c7379956143de293429d1b1b2fb2647776cdcbf65836a1 ghcr.io/github/gh-aw-firewall/squid:0.28.7@sha256:fb362a08d4d2f0da6c036e3f5d3b2fd87931e857fec3ca4a241cd2f2b61131f9 ghcr.io/github/gh-aw-mcpg:v0.4.10@sha256:08bb5fa417aed94b40a14e2b7b3ae457531a5f22b143a32fe58317139d9b8f42 ghcr.io/github/gh-aw-node@sha256:bac2192f6374d6262116399b34fc5e143d576f82719e90a18261cae7480f4d4e ghcr.io/github/github-mcp-server:v1.10.0@sha256:097512ddf58af80a620c177ae9cad93448f9a2a55c70ee8fde5cec6714522a8c
       - name: Prepare Safe Outputs Directories
@@ -1386,6 +1403,7 @@ jobs:
       always() && needs.agent.result == 'success' && needs.safe_outputs.result == 'success'
     runs-on: ubuntu-24.04
     permissions:
+      actions: read
       contents: read
       issues: write
       pull-requests: write
@@ -1479,13 +1497,50 @@ jobs:
           GH_TOKEN: ${{ steps.app-token.outputs.token }}
           REF: ${{ github.event.repository.default_branch }}
           REPO: ${{ github.repository }}
+      - name: Read the pipeline's outcome line
+        id: pipeline
+        if: needs.safe_outputs.outputs.created_pr_number == ''
+        run: |
+          set -euo pipefail
+          # A called workflow shares the caller's run id, so the agent job is in this run.
+          job_id=$(gh api "repos/$REPO/actions/runs/$RUN_ID/jobs?per_page=100" \
+            --jq '[.jobs[] | select(.name | endswith("agent"))] | last | .id // empty')
+          line=""
+          if [ -n "${job_id:-}" ]; then
+            line=$(gh api "repos/$REPO/actions/jobs/${job_id}/logs" 2>/dev/null |
+              grep -oE 'outcome=(succeeded|failed|refused) phase=[a-z]+ change=[^ ]+ commits=[0-9]+ reason=[a-z-]+' |
+              tail -n 1 || true)
+          fi
+          outcome=""
+          phase=""
+          reason=""
+          declined=false
+          if [ -n "$line" ]; then
+            outcome="${line#outcome=}"
+            outcome="${outcome%% *}"
+            phase="${line#*phase=}"
+            phase="${phase%% *}"
+            reason="${line##*reason=}"
+            [ "$outcome" = succeeded ] || declined=true
+          fi
+          {
+            echo "outcome=${outcome}"
+            echo "phase=${phase}"
+            echo "reason=${reason}"
+            echo "declined=${declined}"
+          } >> "$GITHUB_OUTPUT"
+          echo "The pipeline's outcome line: ${line:-<none printed>}"
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          RUN_ID: ${{ github.run_id }}
       - name: Record the outcome
         if: always()
         uses: ./.github/actions/record-outcome
         with:
-          detail: "${{ needs.safe_outputs.outputs.created_pr_number != '' && format('Opened pull request #{0} for this issue.', needs.safe_outputs.outputs.created_pr_number) || 'The run produced no pull request for this issue.' }}"
-          outcome: ${{ needs.safe_outputs.outputs.created_pr_number != '' && 'acted' || 'no-action' }}
-          reason: ${{ needs.safe_outputs.outputs.created_pr_number != '' && 'acted' || 'no-eligible-change' }}
+          detail: "${{ needs.safe_outputs.outputs.created_pr_number != '' && format('Opened pull request #{0} for this issue.', needs.safe_outputs.outputs.created_pr_number) || steps.pipeline.outputs.declined == 'true' && format('The pipeline stopped: {0} in phase {1}, reason {2}. No pull request was requested.', steps.pipeline.outputs.outcome, steps.pipeline.outputs.phase, steps.pipeline.outputs.reason) || 'The run produced no pull request for this issue.' }}"
+          outcome: ${{ needs.safe_outputs.outputs.created_pr_number != '' && 'acted' || steps.pipeline.outputs.declined == 'true' && 'handed-to-human' || 'no-action' }}
+          reason: ${{ needs.safe_outputs.outputs.created_pr_number != '' && 'acted' || steps.pipeline.outputs.declined == 'true' && 'pipeline-declined' || 'no-eligible-change' }}
           route: implement
           subject: "${{ format('#{0}', inputs.issue-number) }}"
 

@@ -1,7 +1,7 @@
 ---
-# Managed by @plainconceptsplatform/workflows@0.5.1. Source: loops/workflows/agent-refine.md. Profile digest: b7d3498150a7. Update with `workflows update --force`; consumer edits may be overwritten.
+# Managed by @plainconceptsplatform/workflows@0.5.1. Source: loops/workflows/agent-refine.md. Profile digest: f67d7ff379d7. Update with `workflows update --force`; consumer edits may be overwritten.
 env:
-  REPO_RULES: "Refine only the selected issue into a grounded, implementation-ready user story. Read repository documentation for domain context. Write acceptance criteria that match existing patterns. Do not implement code."
+  REPO_RULES: "Install with the lockfile frozen; an install that resolves a different tree is not reproducing the change under review. Run scripts through pnpm rather than npx, or a second package manager's lockfile appears in the diff."
   PLAN_EXPLORE_SKILL: plan-explore
   PLAN_STORY_SKILL: plan-story
   PLAN_STORY_COMMAND: plan-story

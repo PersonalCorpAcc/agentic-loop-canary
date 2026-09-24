@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Managed by @plainconceptsplatform/workflows@0.5.1. Source: loops/actions/verify-route-matrix/verify-route-matrix.sh. Profile digest: b7d3498150a7. Update with `workflows update --force`; consumer edits may be overwritten.
+# Managed by @plainconceptsplatform/workflows@0.5.1. Source: loops/actions/verify-route-matrix/verify-route-matrix.sh. Profile digest: f67d7ff379d7. Update with `workflows update --force`; consumer edits may be overwritten.
 # Exercise the router's real classifier. This sources classify-route.sh rather than
 # restating it, so a change to the route table cannot pass here by being copied twice.
 #
@@ -452,6 +452,62 @@ else
   )
 fi
 if [ "$OUTCOME_OK" -eq 1 ]; then PASS=$((PASS + 1)); else FAIL=$((FAIL + 1)); fi
+
+echo "── The pipeline is invoked unattended (FR-047, FR-071) ───────────────────"
+
+# The kit's pipeline has one mode this caller may use. In every other mode it switches
+# branches, stashes, pulls, merges and pushes, none of which this sandbox holds credentials
+# for -- and rather than fail at the first of them it refuses up front, when `CI` is set and
+# no mode token was passed. A worker that invokes the command without the token therefore
+# burns a whole runner and produces nothing, every time, and the only sign of it is one
+# refusal line in the agent's log. Three things are asserted on the installed worker: the
+# invocation carries the token and the issue-context path, no other mention of the command
+# lacks the token, and the identity the pipeline's preconditions demand is declared.
+IMPLEMENT_WORKER="${HERE}/../../workflows/agent-implement.md"
+if [ ! -f "$IMPLEMENT_WORKER" ]; then
+  # A repository that did not select this capability has no implement worker, which is a
+  # supported install rather than a failure.
+  echo "skip: agent-implement.md is not installed here"
+else
+  if grep -qF '/${{ env.PLAN_RUN_COMMAND }} unattended ${{ env.ISSUE_CONTEXT_PATH }}' "$IMPLEMENT_WORKER"; then
+    PASS=$((PASS + 1))
+  else
+    FAIL=$((FAIL + 1))
+    echo "FAIL: agent-implement.md does not invoke the pipeline as '<command> unattended <issue context path>'" >&2
+  fi
+
+  # grep -E has no negative lookahead, so this is two passes: every mention of the command
+  # with what follows it, then the ones the token does not follow. The diagram label counts:
+  # a reader who copies it into an instruction loses the mode with it.
+  bare=$(grep -oE '/\$\{\{ env\.PLAN_RUN_COMMAND \}\}.{0,11}' "$IMPLEMENT_WORKER" | grep -vc ' unattended' || true)
+  if [ "${bare:-0}" -eq 0 ]; then
+    PASS=$((PASS + 1))
+  else
+    FAIL=$((FAIL + 1))
+    echo "FAIL: agent-implement.md names the pipeline command ${bare} time(s) without the unattended token" >&2
+  fi
+
+  # `Name <email>`: the pipeline reads this when the container carries no git configuration
+  # of its own, which is every run, and stops at `identity-missing` when it is absent.
+  identity=$(sed -n 's/^  HARNESS_GIT_IDENTITY: "\(.*\)"$/\1/p' "$IMPLEMENT_WORKER")
+  case "$identity" in
+    *" <"*"@"*">") PASS=$((PASS + 1)) ;;
+    *)
+      FAIL=$((FAIL + 1))
+      echo "FAIL: agent-implement.md declares HARNESS_GIT_IDENTITY as '${identity}', which is not 'Name <email>'" >&2
+      ;;
+  esac
+
+  # The pipeline's first precondition is its specification tool. Only the OpenCode engine's
+  # import used to install it, so under every other engine the kit refused each run with
+  # `missing-tool`. The worker installs it itself now, and this is the installed-copy check.
+  if grep -qE 'npm install -g "@fission-ai/openspec@[0-9.]+"' "$IMPLEMENT_WORKER"; then
+    PASS=$((PASS + 1))
+  else
+    FAIL=$((FAIL + 1))
+    echo "FAIL: agent-implement.md does not install the specification tool the pipeline requires" >&2
+  fi
+fi
 
 echo "── Safe-output overrides (FR-052) ────────────────────────────────────────"
 
