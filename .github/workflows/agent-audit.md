@@ -1,7 +1,7 @@
 ---
-# Managed by @plainconceptsplatform/workflows@0.5.1. Source: loops/workflows/agent-audit.md. Profile digest: b7d3498150a7. Update with `workflows update --force`; consumer edits may be overwritten.
+# Managed by @plainconceptsplatform/workflows@0.5.1. Source: loops/workflows/agent-audit.md. Profile digest: f67d7ff379d7. Update with `workflows update --force`; consumer edits may be overwritten.
 env:
-  REPO_RULES: "Read-only repository audit. Report only reproducible, actionable defects with evidence. Look for: architectural layer violations, missing tests, security gaps, performance issues, and documentation drift. Do not modify files, commit, push, or run write operations."
+  REPO_RULES: "Install with the lockfile frozen; an install that resolves a different tree is not reproducing the change under review. Run scripts through pnpm rather than npx, or a second package manager's lockfile appears in the diff."
   REPO_AUDIT_SKILL: repo-audit
   REPO_AUDIT_COMMAND: repo-audit
   PLAN_STORY_SKILL: plan-story

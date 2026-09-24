@@ -1,4 +1,4 @@
-# Managed by @plainconceptsplatform/workflows@0.5.1. Source: loops/templates/ci/app-ci-node-app.yml. Profile digest: a586f6e065d0. Update with `workflows update --force`; consumer edits may be overwritten.
+# Managed by @plainconceptsplatform/workflows@0.5.1. Source: loops/templates/ci/app-ci-node-app.yml. Profile digest: f67d7ff379d7. Update with `workflows update --force`; consumer edits may be overwritten.
 name: "CI"
 
 # A single Node application: install, lint, build, test. The other node template
