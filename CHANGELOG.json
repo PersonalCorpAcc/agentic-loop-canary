@@ -1,6 +1,34 @@
 {
   "changes": [
     {
+      "timestamp": "2026-11-20T21:25:27Z",
+      "issue": 144,
+      "title": "Lead time: implement label to merged-main, as a tile and trend chart",
+      "summary": "Record #164",
+      "commit": "7f8e81f"
+    },
+    {
+      "timestamp": "2026-11-20T21:25:27Z",
+      "issue": 164,
+      "title": "Throughput and lead-time trend charts",
+      "summary": "Record #207",
+      "commit": "fe6cae8"
+    },
+    {
+      "timestamp": "2026-11-20T21:25:26Z",
+      "issue": 207,
+      "title": "Server: authenticate as a GitHub App and respect GitHub's rate limit",
+      "summary": "Record #162",
+      "commit": "9bdcc1e"
+    },
+    {
+      "timestamp": "2026-11-20T21:06:18Z",
+      "issue": 162,
+      "title": "Flow strip hero cards + work item table + TV mode",
+      "summary": "Merge pull request #215 from PersonalCorpAcc/sync/test-44817090573",
+      "commit": "336abc2"
+    },
+    {
       "timestamp": "2026-11-20T20:24:44Z",
       "issue": 165,
       "title": "Time-in-stage breakdown and the \"waiting on a person\" list",
@@ -111,27 +139,6 @@
       "title": "Deployment frequency: stage-arrival timeline + first trend chart",
       "summary": "Merge pull request #177 from PersonalCorpAcc/sync/test-44781940361",
       "commit": "521f826"
-    },
-    {
-      "timestamp": "2026-09-19T07:52:23+01:00",
-      "issue": 47,
-      "title": "Adopt the design system: copy the components in and mount the provider",
-      "summary": "Carry the release push fix to main",
-      "commit": "e31221b"
-    },
-    {
-      "timestamp": "2026-09-18T19:39:22Z",
-      "issue": 47,
-      "title": "Adopt the design system: copy the components in and mount the provider",
-      "summary": "Copy the RiskPoint theme kit into src/ and mount the provider",
-      "commit": "1332871"
-    },
-    {
-      "timestamp": "2026-09-17T20:00:17Z",
-      "issue": 8,
-      "title": "Add Sort for version slices",
-      "summary": "Add internal/semver package with Sort for version slices",
-      "commit": "d2714a3"
     }
   ]
 }
