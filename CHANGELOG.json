@@ -2,6 +2,13 @@
   "changes": [
     {
       "timestamp": "2026-11-20T19:25:53Z",
+      "issue": 161,
+      "title": "Flow stage engine: label-driven classification, stage history and CFD day-buckets",
+      "summary": "Record #145",
+      "commit": "c5b7df6"
+    },
+    {
+      "timestamp": "2026-11-20T19:25:53Z",
       "issue": 145,
       "title": "Change failure rate and time to restore, as tiles and trend charts",
       "summary": "Record #143",
