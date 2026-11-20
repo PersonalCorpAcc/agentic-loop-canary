@@ -6,6 +6,7 @@ import ToggleButton from "@mui/material/ToggleButton";
 import ToggleButtonGroup from "@mui/material/ToggleButtonGroup";
 import Typography from "@mui/material/Typography";
 
+import { RateLimitBanner } from "@/components/feedback";
 import { RailFrame } from "@/components/layout";
 import { RailNode } from "@/components/primitives";
 import { DEFAULT_PERIOD, PERIODS, PERIOD_LABELS, parsePeriod, type Period } from "../shared/period.js";
@@ -95,9 +96,12 @@ function TopBar(): ReactElement {
         borderBottom: `1px solid ${theme.palette.divider}`,
       })}
     >
-      <Typography variant="body2" sx={(theme) => ({ color: theme.palette.text.secondary })}>
-        {repo === undefined ? "" : repo === null ? "repository unavailable" : `${repo.owner}/${repo.name}`}
-      </Typography>
+      <Stack direction="row" alignItems="center" spacing={2}>
+        <Typography variant="body2" sx={(theme) => ({ color: theme.palette.text.secondary })}>
+          {repo === undefined ? "" : repo === null ? "repository unavailable" : `${repo.owner}/${repo.name}`}
+        </Typography>
+        <RateLimitBanner />
+      </Stack>
       <PeriodSelector />
     </Stack>
   );

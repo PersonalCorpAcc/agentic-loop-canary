@@ -1,4 +1,5 @@
 import type { Stage, StageBlock } from "../shared/types.js";
+import { forgeGet } from "./forge.js";
 import { reposOf } from "./repos.js";
 import { carriedIssuesOf } from "./runs.js";
 
@@ -13,7 +14,6 @@ import { carriedIssuesOf } from "./runs.js";
  */
 
 const repo = reposOf()[0]!;
-const token = process.env["GH_TOKEN"] ?? process.env["GITHUB_TOKEN"] ?? "";
 
 /** The three labels that stop a promotion, in the order `promote-change.sh` checks them --
  *  the order a change carrying more than one is reported in. */
@@ -38,15 +38,8 @@ interface CompareCommit {
 }
 
 async function get<T>(path: string): Promise<T | undefined> {
-  const response = await fetch(`https://api.github.com/repos/${repo}${path}`, {
-    headers: {
-      accept: "application/vnd.github+json",
-      "x-github-api-version": "2022-11-28",
-      ...(token === "" ? {} : { authorization: `Bearer ${token}` }),
-    },
-  });
-  if (!response.ok) return undefined;
-  return response.json() as Promise<T>;
+  const result = await forgeGet<T>(path, repo);
+  return result.body;
 }
 
 /** Every non-merge commit `previous` has that `next` does not -- the content a snapshot

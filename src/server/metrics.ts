@@ -1,6 +1,7 @@
 import type { LoopRun } from "../shared/types.js";
 import type { OutcomeLine } from "../shared/outcome-line.js";
 import { outcomeOf } from "../shared/outcome-line.js";
+import { forgeFetch, forgeGet } from "./forge.js";
 import { listRuns } from "./runs.js";
 
 /**
@@ -14,16 +15,6 @@ import { listRuns } from "./runs.js";
  * previous refresh left, because a refresh only replaces one repository's entry at a time and
  * never clears the map first.
  */
-
-const token = process.env["GH_TOKEN"] ?? process.env["GITHUB_TOKEN"] ?? "";
-
-function headers(): Record<string, string> {
-  return {
-    accept: "application/vnd.github+json",
-    "x-github-api-version": "2022-11-28",
-    ...(token === "" ? {} : { authorization: `Bearer ${token}` }),
-  };
-}
 
 export interface ApiIssue {
   readonly number: number;
@@ -78,58 +69,56 @@ export interface CachedSnapshot {
 }
 
 async function listIssues(repo: string): Promise<ApiIssue[]> {
-  const response = await fetch(`https://api.github.com/repos/${repo}/issues?state=all&per_page=100`, {
-    headers: headers(),
-  });
-  if (!response.ok) throw new Error(`the forge answered ${response.status} for ${repo} issues`);
-  const body = await response.json() as Array<ApiIssue & { pull_request?: unknown }>;
+  const result = await forgeGet<Array<ApiIssue & { pull_request?: unknown }>>("/issues?state=all&per_page=100", repo);
+  if (result.body === undefined) throw new Error(`the forge answered ${result.status} for ${repo} issues`);
   // The issues endpoint also returns pull requests; those are read separately below.
-  return body.filter((issue) => !("pull_request" in issue));
+  return result.body.filter((issue) => !("pull_request" in issue));
 }
 
 async function listPullRequests(repo: string): Promise<ApiPullRequest[]> {
-  const response = await fetch(`https://api.github.com/repos/${repo}/pulls?state=all&per_page=100`, {
-    headers: headers(),
-  });
-  if (!response.ok) throw new Error(`the forge answered ${response.status} for ${repo} pull requests`);
-  return response.json() as Promise<ApiPullRequest[]>;
+  const result = await forgeGet<ApiPullRequest[]>("/pulls?state=all&per_page=100", repo);
+  if (result.body === undefined) throw new Error(`the forge answered ${result.status} for ${repo} pull requests`);
+  return result.body;
 }
 
 async function listLabels(repo: string): Promise<ApiLabel[]> {
-  const response = await fetch(`https://api.github.com/repos/${repo}/labels?per_page=100`, {
-    headers: headers(),
-  });
-  if (!response.ok) throw new Error(`the forge answered ${response.status} for ${repo} labels`);
-  return response.json() as Promise<ApiLabel[]>;
+  const result = await forgeGet<ApiLabel[]>("/labels?per_page=100", repo);
+  if (result.body === undefined) throw new Error(`the forge answered ${result.status} for ${repo} labels`);
+  return result.body;
 }
 
 /** The first job of a run -- the only one the loop's own workflows ever schedule -- or
  *  `undefined` when the forge has nothing to say about it. */
 async function firstJobId(repo: string, runId: number): Promise<number | undefined> {
-  const response = await fetch(`https://api.github.com/repos/${repo}/actions/runs/${runId}/jobs`, {
-    headers: headers(),
-  });
-  if (!response.ok) return undefined;
-  const body = await response.json() as { jobs?: Array<{ id: number }> };
-  return body.jobs?.[0]?.id;
+  const result = await forgeGet<{ jobs?: Array<{ id: number }> }>(`/actions/runs/${runId}/jobs`, repo);
+  return result.body?.jobs?.[0]?.id;
 }
+
+/** One run's outcome line, keyed by run id so a completed run's log -- which cannot change
+ *  once it is written -- is fetched at most once ever, never again on a later poll. A run
+ *  still in progress has no entry to find here, so it is read fresh every time until it
+ *  finishes. */
+const outcomeLineCache = new Map<number, OutcomeLine | undefined>();
 
 /** A run's own outcome line, read out of its job log. Builds on #30 -- the single-run,
  *  per-session read -- rather than duplicating it. */
-async function outcomeLineOf(repo: string, runId: number): Promise<OutcomeLine | undefined> {
-  const jobId = await firstJobId(repo, runId);
+async function outcomeLineOf(repo: string, run: LoopRun): Promise<OutcomeLine | undefined> {
+  if (run.finishedAt !== undefined && outcomeLineCache.has(run.id)) {
+    return outcomeLineCache.get(run.id);
+  }
+  const jobId = await firstJobId(repo, run.id);
   if (jobId === undefined) return undefined;
-  const response = await fetch(`https://api.github.com/repos/${repo}/actions/jobs/${jobId}/logs`, {
-    headers: headers(),
-  });
-  if (!response.ok) return undefined;
-  return outcomeOf(await response.text());
+  const response = await forgeFetch(`/actions/jobs/${jobId}/logs`, repo);
+  if (response === undefined || !response.ok) return undefined;
+  const line = outcomeOf(await response.text());
+  if (run.finishedAt !== undefined) outcomeLineCache.set(run.id, line);
+  return line;
 }
 
-async function runsWithOutcome(repo: string): Promise<LoopRun[]> {
+export async function runsWithOutcome(repo: string): Promise<LoopRun[]> {
   const runs = await listRuns(50, repo);
   return Promise.all(runs.map(async (run) => {
-    const line = await outcomeLineOf(repo, run.id).catch(() => undefined);
+    const line = await outcomeLineOf(repo, run).catch(() => undefined);
     if (line === undefined) return run;
     return {
       ...run,
@@ -146,14 +135,10 @@ async function runsWithOutcome(repo: string): Promise<LoopRun[]> {
 async function fetchIssueTimeline(repo: string, issueNumber: number): Promise<TimelineEvent[]> {
   const events: TimelineEvent[] = [];
   for (let page = 1; ; page += 1) {
-    const response = await fetch(
-      `https://api.github.com/repos/${repo}/issues/${issueNumber}/timeline?per_page=100&page=${page}`,
-      { headers: { ...headers(), accept: "application/vnd.github+json" } },
-    );
-    if (!response.ok) throw new Error(`the forge answered ${response.status} for ${repo}#${issueNumber} timeline`);
-    const body = await response.json() as TimelineEvent[];
-    events.push(...body);
-    if (body.length < 100) break;
+    const result = await forgeGet<TimelineEvent[]>(`/issues/${issueNumber}/timeline?per_page=100&page=${page}`, repo);
+    if (result.body === undefined) throw new Error(`the forge answered ${result.status} for ${repo}#${issueNumber} timeline`);
+    events.push(...result.body);
+    if (result.body.length < 100) break;
   }
   return events;
 }

@@ -1,4 +1,5 @@
 import type { LoopRun } from "../shared/types.js";
+import { forgeGet } from "./forge.js";
 import { reposOf } from "./repos.js";
 
 /**
@@ -14,7 +15,6 @@ import { reposOf } from "./repos.js";
  */
 
 const defaultRepo = reposOf()[0]!;
-const token = process.env["GH_TOKEN"] ?? process.env["GITHUB_TOKEN"] ?? "";
 
 interface ApiRun {
   readonly id: number;
@@ -70,30 +70,15 @@ export function carriedIssuesOf(body: string): number[] {
 }
 
 async function fetchPullRequestBody(repo: string, number: number): Promise<string | undefined> {
-  const response = await fetch(`https://api.github.com/repos/${repo}/pulls/${number}`, {
-    headers: {
-      accept: "application/vnd.github+json",
-      "x-github-api-version": "2022-11-28",
-      ...(token === "" ? {} : { authorization: `Bearer ${token}` }),
-    },
-  });
-  if (!response.ok) return undefined;
-  const body = await response.json() as { body?: string | null };
-  return body.body ?? "";
+  const result = await forgeGet<{ body?: string | null }>(`/pulls/${number}`, repo);
+  return result.body === undefined ? undefined : result.body.body ?? "";
 }
 
 export async function listRuns(limit = 50, repo = defaultRepo): Promise<LoopRun[]> {
-  const response = await fetch(`https://api.github.com/repos/${repo}/actions/runs?per_page=${limit}`, {
-    headers: {
-      accept: "application/vnd.github+json",
-      "x-github-api-version": "2022-11-28",
-      ...(token === "" ? {} : { authorization: `Bearer ${token}` }),
-    },
-  });
-  if (!response.ok) throw new Error(`the forge answered ${response.status}`);
+  const result = await forgeGet<{ workflow_runs?: ApiRun[] }>(`/actions/runs?per_page=${limit}`, repo);
+  if (result.body === undefined) throw new Error(`the forge answered ${result.status}`);
 
-  const body = await response.json() as { workflow_runs?: ApiRun[] };
-  const runs = (body.workflow_runs ?? []).map((run): LoopRun => ({
+  const runs = (result.body.workflow_runs ?? []).map((run): LoopRun => ({
     id: run.id,
     route: routeOf(run),
     // The run list does not carry the loop's own outcome line, so a finished run is described

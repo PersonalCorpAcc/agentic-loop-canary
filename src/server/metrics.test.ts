@@ -1,6 +1,6 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { MetricsCache, type RepoSnapshot } from "./metrics.js";
+import { MetricsCache, runsWithOutcome, type RepoSnapshot } from "./metrics.js";
 
 function snapshotOf(repo: string): RepoSnapshot {
   return { repo, issues: [], pullRequests: [], labels: [], runs: [], issueTimelines: {} };
@@ -67,5 +67,47 @@ describe("the per-repository metrics cache", () => {
 
     resolveFetch?.();
     await inFlight;
+  });
+});
+
+describe("a completed run's log", () => {
+  afterEach(() => vi.unstubAllGlobals());
+
+  it("is fetched at most once across two runsWithOutcome calls for the same run id", async () => {
+    const runId = 990001;
+    const jobsUrl = `https://api.github.com/repos/a/one/actions/runs/${runId}/jobs`;
+    const logsUrl = "https://api.github.com/repos/a/one/actions/jobs/55/logs";
+    let logFetches = 0;
+
+    vi.stubGlobal("fetch", vi.fn(async (url: string) => {
+      if (url.startsWith("https://api.github.com/repos/a/one/actions/runs?")) {
+        return new Response(JSON.stringify({
+          workflow_runs: [{
+            id: runId,
+            name: "Work Router",
+            display_title: "dispatch: implement",
+            status: "completed",
+            conclusion: "success",
+            created_at: "2026-01-01T00:00:00Z",
+            updated_at: "2026-01-01T00:05:00Z",
+            html_url: "https://github.com/a/one/actions/runs/1",
+          }],
+        }), { status: 200 });
+      }
+      if (url === jobsUrl) return new Response(JSON.stringify({ jobs: [{ id: 55 }] }), { status: 200 });
+      if (url === logsUrl) {
+        logFetches += 1;
+        return new Response("outcome=acted route=implement subject=#1 reason=did-a-thing", { status: 200 });
+      }
+      throw new Error(`unexpected request: ${url}`);
+    }));
+
+    const first = await runsWithOutcome("a/one");
+    expect(first[0]?.outcome).toBe("acted");
+    expect(logFetches).toBe(1);
+
+    const second = await runsWithOutcome("a/one");
+    expect(second[0]?.outcome).toBe("acted");
+    expect(logFetches).toBe(1);
   });
 });

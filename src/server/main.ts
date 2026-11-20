@@ -7,6 +7,7 @@ import type { LoopEvent, LoopRun, Stage } from "../shared/types.js";
 import { parseRepo } from "../shared/repo.js";
 import { buildFlow, parsePeriod } from "./flow.js";
 import { fetchRepoSnapshot, MetricsCache } from "./metrics.js";
+import { rateLimiter } from "./rate-limit.js";
 import { reposOf } from "./repos.js";
 import { listRuns } from "./runs.js";
 import { listStages } from "./stages.js";
@@ -29,7 +30,7 @@ import { serveAsset } from "./static.js";
 // local default. Binding a fixed port on a host that routes to a different one is a service
 // that builds, starts, reports healthy, and answers nothing.
 const port = Number(process.env["PORT"] ?? 8787);
-const pollSeconds = Number(process.env["POLL_SECONDS"] ?? 20);
+const pollSeconds = Number(process.env["POLL_SECONDS"] ?? 300);
 const metricsRefreshSeconds = Number(process.env["METRICS_REFRESH_SECONDS"] ?? 60);
 const metricsCache = new MetricsCache(reposOf(), fetchRepoSnapshot);
 const webRoot = process.env["WEB_ROOT"] ?? join(dirname(fileURLToPath(import.meta.url)), "..", "..", "dist");
@@ -100,6 +101,11 @@ const server = createServer(async (request, response) => {
     response.end(JSON.stringify(flow));
     return;
   }
+  if (request.url === "/api/rate-limit") {
+    response.writeHead(200, { "content-type": "application/json" });
+    response.end(JSON.stringify(rateLimiter.snapshot()));
+    return;
+  }
   if (request.url === "/api/health") {
     response.writeHead(200, { "content-type": "application/json" });
     response.end(JSON.stringify({ ok: true }));
@@ -122,7 +128,29 @@ sockets.on("connection", (socket) => {
   send(socket, { kind: "snapshot", runs: [...known.values()] });
 });
 
+// Logged once per pause rather than on every skipped tick, so a ten-minute pause is one line
+// in the log, not thirty.
+let loggedPauseUntil: string | undefined;
+
+/** True while the rate limit says to stop polling -- and, the first tick a given pause is
+ *  seen, logs it once. A fetch cycle skipped here never reaches `listRuns`/`refresh`, so a
+ *  pause never has the chance to overwrite `metricsCache`'s last good snapshot with a
+ *  failure. */
+function isPausedForPolling(): boolean {
+  const { pausedUntil } = rateLimiter.snapshot();
+  if (pausedUntil === null) {
+    loggedPauseUntil = undefined;
+    return false;
+  }
+  if (loggedPauseUntil !== pausedUntil) {
+    loggedPauseUntil = pausedUntil;
+    console.log(`rate limit low: data paused until ${new Date(pausedUntil).toLocaleTimeString()}`);
+  }
+  return true;
+}
+
 async function poll(): Promise<void> {
+  if (isPausedForPolling()) return;
   const runs = await listRuns().catch(() => undefined);
   if (runs === undefined) return;
 
@@ -136,10 +164,15 @@ async function poll(): Promise<void> {
   known = next;
 }
 
+async function refreshMetrics(): Promise<void> {
+  if (isPausedForPolling()) return;
+  await metricsCache.refresh();
+}
+
 server.listen(port, () => {
   console.log(`loopscope on http://localhost:${port}`);
   void poll();
   setInterval(() => void poll(), pollSeconds * 1000);
-  void metricsCache.refresh();
-  setInterval(() => void metricsCache.refresh(), metricsRefreshSeconds * 1000);
+  void refreshMetrics();
+  setInterval(() => void refreshMetrics(), metricsRefreshSeconds * 1000);
 });
