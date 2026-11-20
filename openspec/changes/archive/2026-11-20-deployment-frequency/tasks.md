@@ -14,7 +14,7 @@ tested), the metrics API endpoint, and the two new dependency-free chart
 components — and stops short of mounting them on Overview/Delivery. That wiring
 is one function call once #142 lands and is called out as follow-up.
 
-- [ ] 1. Add `src/server/metrics/deploymentFrequency.ts`: a stage-arrival
+- [x] 1. Add `src/server/metrics/deploymentFrequency.ts`: a stage-arrival
       classifier (`stageArrivalOf`) that reads a `labeled` event's `created_at`
       off an issue's timeline for the `merged-{finalStage}` label (final stage
       from `readStageBranches` in `src/server/strategy.ts`, i.e. the last entry
@@ -33,7 +33,7 @@ is one function call once #142 lands and is called out as follow-up.
       label), read-only and unauthenticated-capable like `stages.ts` /
       `runs.ts`.
 
-- [ ] 2. Tests (`src/server/metrics/deploymentFrequency.test.ts`, Vitest,
+- [x] 2. Tests (`src/server/metrics/deploymentFrequency.test.ts`, Vitest,
       network-free): a fixture of real timeline events built from this
       repository's own history (issues #8, #47, #96, #97, #107 — their real
       `merged-main` label timestamps, fetched via the GitHub API on
@@ -43,7 +43,7 @@ is one function call once #142 lands and is called out as follow-up.
       Cover: day vs. week granularity, zero-merge buckets/period, and the
       previous-period "no prior data" edge case.
 
-- [ ] 3. Add `Sparkline` and `TrendChart` to `components/data-display/` (no
+- [x] 3. Add `Sparkline` and `TrendChart` to `components/data-display/` (no
       chart library — small dependency-free SVG, per the issue's grounding),
       in both `docs/frontend-theme-kit/components/data-display/` (the kit) and
       `src/components/data-display/` (the installed copy), plus a new
@@ -55,7 +55,7 @@ is one function call once #142 lands and is called out as follow-up.
       period") when total is zero, never a flat zero-line. Colour only via
       `useTheme()` (§2.2c) — no literals.
 
-- [ ] 4. Add `GET /api/metrics/deployment-frequency?period=7d|30d|90d` to
+- [x] 4. Add `GET /api/metrics/deployment-frequency?period=7d|30d|90d` to
       `src/server/main.ts`, composing `listIssuesWithLabel` +
       `fetchIssueTimeline` + `computeDeploymentFrequency` +
       `compareToPreviousPeriod` for the requested period and its equal-length
@@ -66,5 +66,5 @@ is one function call once #142 lands and is called out as follow-up.
       `Sparkline` on `Overview.tsx` and a `TrendChart` + `DataTable` (linked to
       each issue) on `Delivery.tsx`, once those pages exist.
 
-- [ ] 6. Verify: `pnpm run typecheck && pnpm run test && pnpm run build`, then
+- [x] 6. Verify: `pnpm run typecheck && pnpm run test && pnpm run build`, then
       `pnpm run lint --fix` over changed files.
