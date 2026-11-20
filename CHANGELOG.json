@@ -2,6 +2,13 @@
   "changes": [
     {
       "timestamp": "2026-11-20T20:24:44Z",
+      "issue": 165,
+      "title": "Time-in-stage breakdown and the \"waiting on a person\" list",
+      "summary": "Record #144",
+      "commit": "7a44e8e"
+    },
+    {
+      "timestamp": "2026-11-20T20:24:44Z",
       "issue": 144,
       "title": "Lead time: implement label to merged-main, as a tile and trend chart",
       "summary": "Record #142",
