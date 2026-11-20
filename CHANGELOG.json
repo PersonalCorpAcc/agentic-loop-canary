@@ -1,6 +1,13 @@
 {
   "changes": [
     {
+      "timestamp": "2026-11-20T21:25:27Z",
+      "issue": 164,
+      "title": "Throughput and lead-time trend charts",
+      "summary": "Record #207",
+      "commit": "fe6cae8"
+    },
+    {
       "timestamp": "2026-11-20T21:25:26Z",
       "issue": 207,
       "title": "Server: authenticate as a GitHub App and respect GitHub's rate limit",
@@ -132,13 +139,6 @@
       "title": "Adopt the design system: copy the components in and mount the provider",
       "summary": "Carry the release push fix to main",
       "commit": "e31221b"
-    },
-    {
-      "timestamp": "2026-09-18T19:39:22Z",
-      "issue": 47,
-      "title": "Adopt the design system: copy the components in and mount the provider",
-      "summary": "Copy the RiskPoint theme kit into src/ and mount the provider",
-      "commit": "1332871"
     }
   ]
 }
