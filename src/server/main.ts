@@ -5,8 +5,9 @@ import { WebSocketServer } from "ws";
 
 import type { LoopEvent, LoopRun, Stage } from "../shared/types.js";
 import { parseRepo } from "../shared/repo.js";
-import { buildFlow, parsePeriod } from "./flow.js";
+import { buildFlow, parsePeriod, periodWindow } from "./flow.js";
 import { fetchRepoSnapshot, MetricsCache } from "./metrics.js";
+import { computeLeadTime } from "./metrics/leadTime.js";
 import { reposOf } from "./repos.js";
 import { listRuns } from "./runs.js";
 import { listStages } from "./stages.js";
@@ -98,6 +99,21 @@ const server = createServer(async (request, response) => {
     const flow = buildFlow(cached.snapshot, parsePeriod(params.get("period")));
     response.writeHead(200, { "content-type": "application/json" });
     response.end(JSON.stringify(flow));
+    return;
+  }
+  if (request.url?.startsWith("/api/lead-time")) {
+    const params = new URL(request.url, "http://localhost").searchParams;
+    const repo = params.get("repo") ?? "";
+    const cached = metricsCache.get(repo);
+    if (cached?.snapshot === undefined) {
+      response.writeHead(404, { "content-type": "application/json" });
+      response.end(JSON.stringify({ error: "not configured or not yet refreshed" }));
+      return;
+    }
+    const { from, to } = periodWindow(parsePeriod(params.get("period")), new Date());
+    const leadTime = computeLeadTime(cached.snapshot.issues, cached.snapshot.issueTimelines, from, to);
+    response.writeHead(200, { "content-type": "application/json" });
+    response.end(JSON.stringify(leadTime));
     return;
   }
   if (request.url === "/api/health") {
