@@ -1,9 +1,11 @@
 import { useEffect, useState, type ReactElement } from "react";
 import { Outlet, useLocation, useNavigate, useSearchParams } from "react-router-dom";
 import Box from "@mui/material/Box";
+import IconButton from "@mui/material/IconButton";
 import Stack from "@mui/material/Stack";
 import ToggleButton from "@mui/material/ToggleButton";
 import ToggleButtonGroup from "@mui/material/ToggleButtonGroup";
+import Tooltip from "@mui/material/Tooltip";
 import Typography from "@mui/material/Typography";
 
 import { RailFrame } from "@/components/layout";
@@ -12,6 +14,12 @@ import { DEFAULT_PERIOD, PERIODS, PERIOD_LABELS, parsePeriod, type Period } from
 import type { RepoRef } from "../shared/repo.js";
 
 const NAV_RAIL_WIDTH = 240;
+
+/** `?tv=1` → on, mirroring `period.ts`'s own `parsePeriod` validate-or-fall-back shape, just
+ *  for a boolean instead of an enum (#162). */
+export function parseTv(raw: string | null): boolean {
+  return raw === "1";
+}
 
 interface NavEntry {
   readonly label: string;
@@ -28,6 +36,20 @@ const NAV_ENTRIES: readonly NavEntry[] = [
  *  period selector) above the routed page, built once so every child route — Overview,
  *  Delivery, the retired log view at `/loop` — shares the same chrome. */
 export function Shell(): ReactElement {
+  const [searchParams] = useSearchParams();
+  const tv = parseTv(searchParams.get("tv"));
+
+  if (tv) {
+    return (
+      <Box sx={{ position: "relative", height: "100vh", minHeight: 0 }}>
+        <Box sx={{ height: "100%", minHeight: 0, overflow: "auto" }}>
+          <Outlet />
+        </Box>
+        <ExitTvButton />
+      </Box>
+    );
+  }
+
   return (
     <Stack direction="row" sx={{ height: "100vh", minHeight: 0 }}>
       <Box sx={{ width: NAV_RAIL_WIDTH, flexShrink: 0, p: 1 }}>
@@ -42,6 +64,40 @@ export function Shell(): ReactElement {
         </Box>
       </Stack>
     </Stack>
+  );
+}
+
+/** Always-reachable way out of TV mode (#162) — a small floating button rather than relying on
+ *  the back button, since TV mode strips every other piece of chrome from the viewport. */
+function ExitTvButton(): ReactElement {
+  const [searchParams, setSearchParams] = useSearchParams();
+
+  const exitTv = (): void => {
+    setSearchParams((current) => {
+      const next = new URLSearchParams(current);
+      next.delete("tv");
+      return next;
+    });
+  };
+
+  return (
+    <Tooltip title="Exit TV mode">
+      <IconButton
+        onClick={exitTv}
+        aria-label="Exit TV mode"
+        size="small"
+        sx={(theme) => ({
+          position: "absolute",
+          top: 8,
+          right: 8,
+          backgroundColor: theme.palette.background.paper,
+          border: `1px solid ${theme.palette.divider}`,
+          "&:hover": { backgroundColor: theme.palette.action.hover },
+        })}
+      >
+        ✕
+      </IconButton>
+    </Tooltip>
   );
 }
 
@@ -98,8 +154,31 @@ function TopBar(): ReactElement {
       <Typography variant="body2" sx={(theme) => ({ color: theme.palette.text.secondary })}>
         {repo === undefined ? "" : repo === null ? "repository unavailable" : `${repo.owner}/${repo.name}`}
       </Typography>
-      <PeriodSelector />
+      <Stack direction="row" spacing={1} alignItems="center">
+        <PeriodSelector />
+        <TvModeButton />
+      </Stack>
     </Stack>
+  );
+}
+
+function TvModeButton(): ReactElement {
+  const [searchParams, setSearchParams] = useSearchParams();
+
+  const enterTv = (): void => {
+    setSearchParams((current) => {
+      const next = new URLSearchParams(current);
+      next.set("tv", "1");
+      return next;
+    });
+  };
+
+  return (
+    <Tooltip title="TV mode">
+      <IconButton onClick={enterTv} aria-label="Enter TV mode" size="small">
+        ⛶
+      </IconButton>
+    </Tooltip>
   );
 }
 
