@@ -4,6 +4,7 @@ import { fileURLToPath } from "node:url";
 import { WebSocketServer } from "ws";
 
 import type { LoopEvent, LoopRun, Stage } from "../shared/types.js";
+import { buildFlow, parsePeriod } from "./flow.js";
 import { fetchRepoSnapshot, MetricsCache } from "./metrics.js";
 import { reposOf } from "./repos.js";
 import { listRuns } from "./runs.js";
@@ -75,6 +76,20 @@ const server = createServer(async (request, response) => {
     const cached = metricsCache.get(repo);
     response.writeHead(cached === undefined ? 404 : 200, { "content-type": "application/json" });
     response.end(JSON.stringify(cached ?? { error: "not configured or not yet refreshed" }));
+    return;
+  }
+  if (request.url?.startsWith("/api/flow")) {
+    const params = new URL(request.url, "http://localhost").searchParams;
+    const repo = params.get("repo") ?? "";
+    const cached = metricsCache.get(repo);
+    if (cached?.snapshot === undefined) {
+      response.writeHead(404, { "content-type": "application/json" });
+      response.end(JSON.stringify({ error: "not configured or not yet refreshed" }));
+      return;
+    }
+    const flow = buildFlow(cached.snapshot, parsePeriod(params.get("period")));
+    response.writeHead(200, { "content-type": "application/json" });
+    response.end(JSON.stringify(flow));
     return;
   }
   if (request.url === "/api/health") {
