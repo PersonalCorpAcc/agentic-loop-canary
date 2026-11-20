@@ -1,4 +1,4 @@
-# Managed by @software-factory-dev/cli@0.5.1. Source: loops/workflows/work-router.yml. Profile digest: b4bdd2d76a31. Update with `workflows update --force`; consumer edits may be overwritten.
+# Managed by @software-factory-dev/cli@0.5.1. Source: loops/workflows/work-router.yml. Profile digest: 049269cfb7da. Update with `workflows update --force`; consumer edits may be overwritten.
 name: "All Work Router"
 
 # Owns every repository automation trigger. Classifies each event into exactly one route,
@@ -385,6 +385,7 @@ jobs:
       pr-merged: ${{ steps.route.outputs.pr-merged }}
       pr-base: ${{ steps.route.outputs.pr-base }}
       closes-issue: ${{ steps.route.outputs.closes-issue }}
+      implement-lane: ${{ steps.lane.outputs.lane }}
     steps:
       - name: Checkout workflow actions
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -395,6 +396,16 @@ jobs:
         uses: ./.github/actions/classify-route
         with:
           token: ${{ github.token }}
+      # Which implement lane this issue queues in: `branching.concurrentImplements` lanes, the
+      # issue number modulo their count. A concurrency group cannot say "at most N", but N
+      # groups can, and the same issue always lands in the same lane.
+      - name: Choose the implement lane
+        id: lane
+        if: steps.route.outputs.route == 'implement'
+        env:
+          ISSUE: ${{ steps.route.outputs.issue-number }}
+          LANES: "2"
+        run: echo "lane=$(( ${ISSUE:-0} % LANES ))" >> "$GITHUB_OUTPUT"
       # The route is annotated on every run, including the many that choose none: an event
       # that went nowhere and an event nothing was listening for look identical otherwise.
       - name: Record the outcome
@@ -559,8 +570,9 @@ jobs:
       # global group would implement one of six labelled issues and drop five -- hence the
       # queue. Keyed per issue that default is exactly right: two events for one issue collapse
       # into one pending run instead of producing two agents and two pull requests.
-      group: implement-${{ needs.classify.outputs.issue-number }}
+      group: implement-lane-${{ needs.classify.outputs.implement-lane }}
       cancel-in-progress: false
+      queue: max
     permissions: write-all
     with:
       issue-number: ${{ needs.classify.outputs.issue-number }}
