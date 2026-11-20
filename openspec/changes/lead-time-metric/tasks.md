@@ -54,7 +54,7 @@ Scope decisions, made so implementation does not re-litigate them:
 
 ## 1. `computeLeadTime` and its types
 
-- [ ] 1.1 Add `src/server/metrics/leadTime.ts` (new directory, alongside the existing
+- [x] 1.1 Add `src/server/metrics/leadTime.ts` (new directory, alongside the existing
       `src/server/metrics.ts` file — both resolve fine since every import in this
       repository already uses explicit `.js` extensions). Export:
       - `LeadTimeEntry { issue: number; title: string; url: string; days: number; mergedAt: string }`
@@ -66,7 +66,7 @@ Scope decisions, made so implementation does not re-litigate them:
       - `computeLeadTime(issues: readonly { number: number; title: string; html_url: string; }[], timelines: Record<number, readonly TimelineEvent[]>, from: Date, to: Date): LeadTimeResult`
         implementing the algorithm above. Only type-import `TimelineEvent` from
         `../metrics.js`.
-- [ ] 1.2 Add `src/server/metrics/leadTime.test.ts`: hand-built `TimelineEvent[]` fixtures
+- [x] 1.2 Add `src/server/metrics/leadTime.test.ts`: hand-built `TimelineEvent[]` fixtures
       (mirroring the forge's real `labeled`/`unlabeled` shape, the same style
       `flow.test.ts` already uses) covering, each asserted against an exact expected
       value:
@@ -99,13 +99,13 @@ Scope decisions, made so implementation does not re-litigate them:
 
 ## 3. `Sparkline` and `TrendChart` (minimal, new — see scope decision above)
 
-- [ ] 3.1 Add `src/components/data-display/Sparkline.tsx`: a small inline-SVG line
+- [x] 3.1 Add `src/components/data-display/Sparkline.tsx`: a small inline-SVG line
       (props: `points: readonly number[]`, optional `width`/`height` with sensible
       defaults e.g. 80×24), stroke colour from a theme token (`theme.palette.brand.main`
       via `useTheme()`, not a literal — Rule 2), no axes/labels/legend (it is a sparkline).
       Render nothing (or a muted empty state, `HelperText`) for fewer than two points —
       never throw on an empty series.
-- [ ] 3.2 Add `src/components/data-display/TrendChart.tsx`: a larger inline-SVG line
+- [x] 3.2 Add `src/components/data-display/TrendChart.tsx`: a larger inline-SVG line
       chart (props: `points: readonly { date: string; value: number }[]`, `height`
       e.g. 160, optional `valueLabel` formatter for the Y hover/axis text), still theme
       tokens only, with a simple date axis (a handful of tick labels, not every point) and
@@ -114,7 +114,7 @@ Scope decisions, made so implementation does not re-litigate them:
       not pull in a charting library for this).
       Export both from `src/components/data-display/index.ts` (already exists —
       add the two exports alongside `DataTable`/`KeyValueGrid`).
-- [ ] 3.3 These are presentational only — no tests required beyond the typecheck/build
+- [x] 3.3 These are presentational only — no tests required beyond the typecheck/build
       gate (this repository's test convention is for computation modules, e.g.
       `timeInStageBar.ts`/`waitingOnPerson.ts`, not for `.tsx` renderers, which have no
       existing test precedent in `src/components/`).
