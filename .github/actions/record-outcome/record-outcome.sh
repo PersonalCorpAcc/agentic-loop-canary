@@ -53,6 +53,9 @@ readonly REASONS=(
   # A human is needed, or the machinery could not proceed.
   conflict-handed-off
   review-requested
+  # A reviewer asked for changes on the pull request; apply-review answers it, not the gate
+  # (T246). Missing from this list until 20/11/2026, so the gate's step failed on first use.
+  changes-requested
   # The implementing worker asked the kit for the whole change and the kit declined:
   # refused before it wrote anything, or failed its own gates after. Its reason token
   # is its own vocabulary and belongs in the detail sentence, not in this set -- what
