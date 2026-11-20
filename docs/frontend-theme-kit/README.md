@@ -489,6 +489,7 @@ All of these are domain-free and drop-in. Check here before writing anything.
 | `CollapsibleCard` | `title, rightSlot?, defaultOpen?, children` |
 | `KeyValueGrid` | `entries: Record<string, string \| null>, sx?` |
 | `DataTable<R>` | `rows, columns, getRowId, onRowClick?, loading?, fetching?, skeletonRows?, emptyMessage?, searchable?, searchPlaceholder?, initialSort?, pagination?` |
+| `TrendChart` | `title, days: string[], series: TrendSeries[], formatValue?, emptyMessage?` -- an SVG day-by-day line chart (axis both sides, hover/focus tooltip, legend for 2+ series, empty state). Series are app-agnostic (`trendChart.ts`'s `seriesByKeyOf`/`scalarSeriesOf` build them from any `{ day: string }`-shaped aggregate); a key with no value on a day is simply not drawn for that day, never a zero point. Ships its own small 4-hue categorical ramp local to chart series -- the app's brand/accent/status tokens fail a categorical CVD check as a multi-series set. |
 
 Read `DataTable` before writing any table. It distinguishes **`loading`** (first
 load → skeleton rows, sized to the page size so the card lands at its final
@@ -575,7 +576,7 @@ theme/                       copy verbatim — the whole design system
 components/primitives/       17 files + barrel — MUI-only atoms
 components/layout/           8 containers + chrome.ts + barrel
 components/containers/       CollapsibleCard + barrel
-components/data-display/     DataTable, KeyValueGrid
+components/data-display/     DataTable, KeyValueGrid, TrendChart (+ trendChart.ts)
 lib/statusStyles.ts          domain adapter — REWRITE this (step 7)
 
 CLAUDE-section.md            paste into the new repo's CLAUDE.md (step 10)
