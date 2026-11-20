@@ -2,6 +2,13 @@
   "changes": [
     {
       "timestamp": "2026-11-20T19:25:54Z",
+      "issue": 154,
+      "title": "Metrics API: cached issues, pull requests, labels, runs and outcome lines across repositories",
+      "summary": "Record #142",
+      "commit": "8bc875b"
+    },
+    {
+      "timestamp": "2026-11-20T19:25:54Z",
       "issue": 142,
       "title": "Delivery dashboard shell: dark theme, routing, nav rail, top bar",
       "summary": "Record #149",
