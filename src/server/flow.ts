@@ -41,6 +41,7 @@ export interface LinkedPr {
   readonly labels: readonly string[];
   readonly state: "open" | "closed";
   readonly reviewDecision?: string | null;
+  readonly url?: string;
 }
 
 export interface FlowClassification {
@@ -192,6 +193,12 @@ export interface FlowItem {
   readonly held: boolean;
   readonly history: readonly FlowStageEntry[];
   readonly durationsMs: Record<FlowStageName, number>;
+  /** The issue's own labels, for the work item table's `sp-N` estimate column (#162) --
+   *  read straight off the issue, never re-derived from the stage classification. */
+  readonly labels: readonly string[];
+  /** The linked pull request's own page, when one exists -- for the work item table's PR
+   *  link column (#162). Absent when `linkedPrOf` finds no linked pull request. */
+  readonly prUrl?: string;
 }
 
 export interface CfdBucket {
@@ -250,7 +257,11 @@ function linkedPrOf(issue: ApiIssue, pullRequests: readonly ApiPullRequest[]): L
   const candidates = pullRequests.filter((pr) => carriedIssuesOf(pr.body ?? "").includes(issue.number));
   const pr = candidates.find((candidate) => candidate.state === "open") ?? candidates[0];
   if (pr === undefined) return undefined;
-  return { labels: labelNames(pr.labels), state: pr.state === "open" ? "open" : "closed" };
+  return {
+    labels: labelNames(pr.labels),
+    state: pr.state === "open" ? "open" : "closed",
+    url: pr.html_url,
+  };
 }
 
 function buildFlowItem(issue: ApiIssue, snapshot: RepoSnapshot, now: Date): FlowItem {
@@ -263,7 +274,17 @@ function buildFlowItem(issue: ApiIssue, snapshot: RepoSnapshot, now: Date): Flow
     createdAt: issue.created_at,
   });
   const durationsMs = stageDurations(history, now.toISOString());
-  return { issue: issue.number, title: issue.title, url: issue.html_url, stage, held, history, durationsMs };
+  return {
+    issue: issue.number,
+    title: issue.title,
+    url: issue.html_url,
+    stage,
+    held,
+    history,
+    durationsMs,
+    labels,
+    ...(linkedPr?.url !== undefined ? { prUrl: linkedPr.url } : {}),
+  };
 }
 
 function zeroCounts(): Record<FlowStageName, number> {

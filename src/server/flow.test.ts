@@ -266,4 +266,23 @@ describe("building a flow result off a cached snapshot", () => {
     const total = Object.values(result.items[0]?.durationsMs ?? {}).reduce((sum, ms) => sum + ms, 0);
     expect(total).toBe(now.getTime() - new Date("2026-01-01T00:00:00Z").getTime());
   });
+
+  // #162, the work item table's estimate (off labels) and PR link columns.
+  it("carries the issue's own labels and its linked PR's url", () => {
+    const snapshot = snapshotOf(
+      [issue({ number: 161, labels: ["implement", "sp-3"] })],
+      [pullRequest({ number: 200, body: "<!-- implement-issue: 161 -->", labels: ["review"] })],
+    );
+
+    const result = buildFlow(snapshot, { days: 30 }, new Date("2026-01-10T00:00:00Z"));
+
+    expect(result.items[0]?.labels).toEqual(["implement", "sp-3"]);
+    expect(result.items[0]?.prUrl).toBe("https://github.com/a/one/pull/200");
+  });
+
+  it("leaves prUrl undefined when an item has no linked PR", () => {
+    const snapshot = snapshotOf([issue({ number: 1, labels: ["triage"] })]);
+    const result = buildFlow(snapshot, { days: 30 }, new Date("2026-01-10T00:00:00Z"));
+    expect(result.items[0]?.prUrl).toBeUndefined();
+  });
 });
