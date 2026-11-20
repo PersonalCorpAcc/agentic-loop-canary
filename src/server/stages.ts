@@ -1,4 +1,5 @@
 import type { Stage, StageBlock } from "../shared/types.js";
+import { reposOf } from "./repos.js";
 import { carriedIssuesOf } from "./runs.js";
 
 /**
@@ -11,7 +12,7 @@ import { carriedIssuesOf } from "./runs.js";
  * same forge the loop does; it changes nothing.
  */
 
-const repo = process.env["LOOP_REPO"] ?? "PersonalCorpAcc/agentic-loop-canary";
+const repo = reposOf()[0]!;
 const token = process.env["GH_TOKEN"] ?? process.env["GITHUB_TOKEN"] ?? "";
 
 /** The three labels that stop a promotion, in the order `promote-change.sh` checks them --
