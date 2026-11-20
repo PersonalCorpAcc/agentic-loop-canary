@@ -106,8 +106,11 @@ jobs:
               }
             }' \
             -f owner="${REPO%/*}" -f name="${REPO#*/}" -F number="$PR" \
-            --jq -c '[.data.repository.pullRequest.reviewThreads.nodes[]
-                      | select(.isResolved == false and .isOutdated == false)]')
+            --jq '[.data.repository.pullRequest.reviewThreads.nodes[]
+                      | select(.isResolved == false and .isOutdated == false)]' | jq -c .)
+          # gh's jq option takes an expression only: given the compact flag first, gh read the flag as the filter and the
+          # filter as a second endpoint, and failed "accepts 1 arg(s), received 2" on the first
+          # review anyone requested (loopscope PR #158, 20/11/2026).
           unresolved=$(printf '%s' "$threads" | jq 'length')
 
           # Measured and then acted on. Two events arrive for one review -- the submission and
