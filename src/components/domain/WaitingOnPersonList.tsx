@@ -13,7 +13,8 @@ import { HelperText, StatusText } from "@/components/primitives";
 
 import type { WaitingRow } from "../../web/waitingOnPerson.js";
 
-function humanizeAge(ageMs: number): string {
+/** `1h`/`3d`-shaped age text, shared with the Overview page's work item table (#162). */
+export function humanizeAge(ageMs: number): string {
   const hours = Math.floor(ageMs / 3_600_000);
   if (hours < 24) return `${hours}h`;
   const days = Math.floor(hours / 24);
