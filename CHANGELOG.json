@@ -1,6 +1,62 @@
 {
   "changes": [
     {
+      "timestamp": "2026-11-20T19:25:54Z",
+      "issue": 148,
+      "title": "Loop page: recent activity table",
+      "summary": "Record #154",
+      "commit": "e03b9de"
+    },
+    {
+      "timestamp": "2026-11-20T19:25:54Z",
+      "issue": 154,
+      "title": "Metrics API: cached issues, pull requests, labels, runs and outcome lines across repositories",
+      "summary": "Record #142",
+      "commit": "8bc875b"
+    },
+    {
+      "timestamp": "2026-11-20T19:25:54Z",
+      "issue": 142,
+      "title": "Delivery dashboard shell: dark theme, routing, nav rail, top bar",
+      "summary": "Record #149",
+      "commit": "c226185"
+    },
+    {
+      "timestamp": "2026-11-20T19:25:53Z",
+      "issue": 149,
+      "title": "Loop page: activity trends",
+      "summary": "Record #166",
+      "commit": "def238b"
+    },
+    {
+      "timestamp": "2026-11-20T19:25:53Z",
+      "issue": 166,
+      "title": "Deployment pipeline graphic with soak timers",
+      "summary": "Record #161",
+      "commit": "05b54ec"
+    },
+    {
+      "timestamp": "2026-11-20T19:25:53Z",
+      "issue": 161,
+      "title": "Flow stage engine: label-driven classification, stage history and CFD day-buckets",
+      "summary": "Record #145",
+      "commit": "c5b7df6"
+    },
+    {
+      "timestamp": "2026-11-20T19:25:53Z",
+      "issue": 145,
+      "title": "Change failure rate and time to restore, as tiles and trend charts",
+      "summary": "Record #143",
+      "commit": "6bf67c5"
+    },
+    {
+      "timestamp": "2026-11-20T18:58:47Z",
+      "issue": 143,
+      "title": "Deployment frequency: stage-arrival timeline + first trend chart",
+      "summary": "Merge pull request #195 from PersonalCorpAcc/sync/test-44797637236",
+      "commit": "be10e0e"
+    },
+    {
       "timestamp": "2026-11-20T18:25:08Z",
       "issue": 149,
       "title": "Loop page: activity trends",
