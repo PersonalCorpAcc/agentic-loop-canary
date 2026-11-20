@@ -1,6 +1,13 @@
 {
   "changes": [
     {
+      "timestamp": "2026-11-20T18:25:07Z",
+      "issue": 145,
+      "title": "Change failure rate and time to restore, as tiles and trend charts",
+      "summary": "Record #143",
+      "commit": "6fae4b4"
+    },
+    {
       "timestamp": "2026-11-20T17:19:25Z",
       "issue": 143,
       "title": "Deployment frequency: stage-arrival timeline + first trend chart",
