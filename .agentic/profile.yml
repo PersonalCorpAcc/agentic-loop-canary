@@ -207,6 +207,13 @@ crons:
   promote: "*/10 * * * *"
   syncStages: off
 
+canary:
+  # The daily canary cycle (FR-060). On since 20/11/2026: JC started the T143 clock. 03:17 here,
+  # 04:17 on the chain canary, 05:17 on the release canary, so no two share an hour of budget.
+  cron: "17 3 * * *"
+  standInSecret: CANARY_STAND_IN_TOKEN
+  peers: [PersonalCorpAcc/agentic-loop-chain, PersonalCorpAcc/agentic-loop-release]
+
 constitution:
   entry: AGENTS.md
   docs: [ARCHITECTURE.md]

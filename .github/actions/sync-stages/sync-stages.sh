@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Managed by @software-factory-dev/cli@0.5.1. Source: loops/actions/sync-stages/sync-stages.sh. Profile digest: a936a27c9791. Update with `workflows update --force`; consumer edits may be overwritten.
+# Managed by @software-factory-dev/cli@0.5.1. Source: loops/actions/sync-stages/sync-stages.sh. Profile digest: d048fc8f4fff. Update with `workflows update --force`; consumer edits may be overwritten.
 #
 # Carry a change that arrived on a later stage back down the chain (FR-079).
 #

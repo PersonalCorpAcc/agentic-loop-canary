@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Managed by @software-factory-dev/cli@0.5.1. Source: loops/actions/guard-branch-write/guard-branch-write.sh. Profile digest: a936a27c9791. Update with `workflows update --force`; consumer edits may be overwritten.
+# Managed by @software-factory-dev/cli@0.5.1. Source: loops/actions/guard-branch-write/guard-branch-write.sh. Profile digest: d048fc8f4fff. Update with `workflows update --force`; consumer edits may be overwritten.
 #
 # May this job write this branch? (FR-063)
 #
