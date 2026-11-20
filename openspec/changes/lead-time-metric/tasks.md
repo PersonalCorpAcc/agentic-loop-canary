@@ -86,11 +86,11 @@ Scope decisions, made so implementation does not re-litigate them:
 
 ## 2. API endpoint
 
-- [ ] 2.1 In `src/server/flow.ts`, export a small `periodWindow(period: Period, now: Date): { from: Date; to: Date }`
+- [x] 2.1 In `src/server/flow.ts`, export a small `periodWindow(period: Period, now: Date): { from: Date; to: Date }`
       factored out of `buildFlow`'s existing inline `from`/`to` computation (so `buildFlow`
       calls it too — one computation, not two) rather than duplicating the "all" vs.
       "days" branch a second time in `main.ts`.
-- [ ] 2.2 In `src/server/main.ts`, add a `/api/lead-time` route following the exact
+- [x] 2.2 In `src/server/main.ts`, add a `/api/lead-time` route following the exact
       `/api/flow` pattern: parse `repo`/`period` query params, 404 with the same error
       body when `metricsCache.get(repo)?.snapshot` is undefined, else resolve
       `{ from, to }` via `periodWindow(parsePeriod(...), new Date())` and respond with

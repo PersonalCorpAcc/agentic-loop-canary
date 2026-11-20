@@ -307,12 +307,23 @@ function earliestCreatedAt(issues: readonly ApiIssue[]): Date | undefined {
     .sort((a, b) => a.getTime() - b.getTime())[0];
 }
 
+/** A `Period` resolved against `now` into concrete `from`/`to` instants -- the one piece of
+ *  date math `buildFlow` needs, factored out so `/api/lead-time` (#144) can reuse the same
+ *  "all" vs. "days" branch rather than duplicating it a second time in `main.ts`. `allFrom` is
+ *  an optional fallback for the "all" branch's `from` (defaulting to `now`, an empty window)
+ *  -- `buildFlow` passes its snapshot's earliest issue `created_at` here so this stays the
+ *  single place the "all" vs. "days" branch is written, rather than re-checking `period` a
+ *  second time in `buildFlow` just to override `from` afterwards. */
+export function periodWindow(period: Period, now: Date, allFrom?: Date): { from: Date; to: Date } {
+  const to = now;
+  const from = "all" in period ? allFrom ?? to : new Date(to.getTime() - period.days * 86_400_000);
+  return { from, to };
+}
+
 /** Classified items and day-bucketed CFD counts, built entirely from a cached snapshot --
  *  never a live forge read (#154's contract, which `/api/flow` keeps). */
 export function buildFlow(snapshot: RepoSnapshot, period: Period, now: Date = new Date()): FlowResult {
   const items = snapshot.issues.map((issue) => buildFlowItem(issue, snapshot, now));
-  const to = now;
-  const from =
-    "all" in period ? earliestCreatedAt(snapshot.issues) ?? to : new Date(to.getTime() - period.days * 86_400_000);
+  const { from, to } = periodWindow(period, now, earliestCreatedAt(snapshot.issues));
   return { items, cfd: cfdBuckets(items, from, to), from: from.toISOString(), to: to.toISOString() };
 }
