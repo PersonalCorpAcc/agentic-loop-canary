@@ -24,6 +24,7 @@ function item(partial: Partial<FlowItem> & Pick<FlowItem, "issue" | "stage">): F
     held: false,
     history: [],
     durationsMs: zeroDurations(),
+    createdAt: "2026-01-01T00:00:00Z",
     ...partial,
   };
 }

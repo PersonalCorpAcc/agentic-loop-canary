@@ -192,6 +192,9 @@ export interface FlowItem {
   readonly held: boolean;
   readonly history: readonly FlowStageEntry[];
   readonly durationsMs: Record<FlowStageName, number>;
+  /** The issue's own `created_at` (#154's cache), carried through so a lead-time computation
+   *  (#164) can pair it with the item's `shipped` history entry without a second API shape. */
+  readonly createdAt: string;
 }
 
 export interface CfdBucket {
@@ -263,7 +266,16 @@ function buildFlowItem(issue: ApiIssue, snapshot: RepoSnapshot, now: Date): Flow
     createdAt: issue.created_at,
   });
   const durationsMs = stageDurations(history, now.toISOString());
-  return { issue: issue.number, title: issue.title, url: issue.html_url, stage, held, history, durationsMs };
+  return {
+    issue: issue.number,
+    title: issue.title,
+    url: issue.html_url,
+    stage,
+    held,
+    history,
+    durationsMs,
+    createdAt: issue.created_at,
+  };
 }
 
 function zeroCounts(): Record<FlowStageName, number> {
