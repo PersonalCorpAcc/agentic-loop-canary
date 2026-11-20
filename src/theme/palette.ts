@@ -93,3 +93,72 @@ export const palette: PaletteOptions = {
   },
   divider: paper.rule,
 };
+
+/**
+ * Dark-mode tokens for the delivery dashboard shell (#142). The kit ships
+ * light-mode only, and `brand.main` does double duty as both ink (nav rail
+ * label text, links, the focus ring) and fill (MuiButton/MuiTab/MuiToggleButton
+ * selected backgrounds, paired with `brand.contrastText`) — a single hex can't
+ * read as light-on-dark ink *and* host dark-on-light fill text at once. The
+ * fix is per-palette `brand.contrastText` (already an unused field on
+ * `BrandColor`): here `brand.main` is a light ink shade (reused `brand[300]`)
+ * and `contrastText` is a dark ink, so `components.ts`'s fills stay correct
+ * without needing mode-specific overrides there. Values were chosen against
+ * `contrast.ts` for every pairing the shell (nav rail / top bar / page
+ * background) actually renders — see the task notes in
+ * `openspec/changes/dashboard-shell/`. `status.*` is intentionally left
+ * unchanged: it is only ever read through `useStatusTone`, which derives its
+ * own tinted background via `alpha()` rather than painting raw status text
+ * straight onto a page surface, and status badges are not part of the shell
+ * chrome this story scopes (nav rail / top bar / page background).
+ */
+const darkBrand = {
+  ...brand,
+  main: brand[300],
+  light: brand[400],
+  dark: brand[200],
+  contrastText: "#0b1220",
+};
+
+const darkAccent = {
+  ...accent,
+  main: accent[300],
+  light: accent[200],
+  dark: accent[400],
+  contrastText: "#0b1220",
+  50: "#1c2c40",
+  100: "#223448",
+};
+
+export const darkPalette: PaletteOptions = {
+  mode: "dark",
+  primary: darkBrand,
+  secondary: darkAccent,
+  brand: darkBrand,
+  paper: {
+    main: "#0b1220",
+    ink: "#eef2f7",
+    rule: "#243248",
+    ruleStrong: "#3b5068",
+    muted: "#17233a",
+  },
+  accent: darkAccent,
+  status,
+  border: {
+    strong: "#3b5068",
+  },
+  surface: {
+    raised: "#111b2e",
+    muted: "#17233a",
+  },
+  background: {
+    default: "#0b1220",
+    paper: "#111b2e",
+  },
+  text: {
+    primary: "#eef2f7",
+    secondary: "#a8b6c9",
+    disabled: "#7e8da3",
+  },
+  divider: "#243248",
+};

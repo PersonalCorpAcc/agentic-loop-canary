@@ -4,6 +4,7 @@ import { fileURLToPath } from "node:url";
 import { WebSocketServer } from "ws";
 
 import type { LoopEvent, LoopRun, Stage } from "../shared/types.js";
+import { parseRepo } from "../shared/repo.js";
 import { buildFlow, parsePeriod } from "./flow.js";
 import { fetchRepoSnapshot, MetricsCache } from "./metrics.js";
 import { reposOf } from "./repos.js";
@@ -53,7 +54,14 @@ const stageBranches = ((): string[] => {
   }
 })();
 
+const repo = parseRepo(process.env["LOOP_REPO"] ?? "PersonalCorpAcc/agentic-loop-canary");
+
 const server = createServer(async (request, response) => {
+  if (request.url === "/api/repo") {
+    response.writeHead(200, { "content-type": "application/json" });
+    response.end(JSON.stringify(repo));
+    return;
+  }
   if (request.url === "/api/runs") {
     const runs = await listRuns().catch(() => [] as LoopRun[]);
     response.writeHead(200, { "content-type": "application/json" });
