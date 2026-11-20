@@ -1,6 +1,41 @@
 {
   "changes": [
     {
+      "timestamp": "2026-11-20T18:25:08Z",
+      "issue": 149,
+      "title": "Loop page: activity trends",
+      "summary": "Record #166",
+      "commit": "a0d532c"
+    },
+    {
+      "timestamp": "2026-11-20T18:25:08Z",
+      "issue": 166,
+      "title": "Deployment pipeline graphic with soak timers",
+      "summary": "Record #161",
+      "commit": "4f0a2d2"
+    },
+    {
+      "timestamp": "2026-11-20T18:25:08Z",
+      "issue": 161,
+      "title": "Flow stage engine: label-driven classification, stage history and CFD day-buckets",
+      "summary": "Record #145",
+      "commit": "b63a2cc"
+    },
+    {
+      "timestamp": "2026-11-20T18:25:07Z",
+      "issue": 145,
+      "title": "Change failure rate and time to restore, as tiles and trend charts",
+      "summary": "Record #143",
+      "commit": "6fae4b4"
+    },
+    {
+      "timestamp": "2026-11-20T17:19:25Z",
+      "issue": 143,
+      "title": "Deployment frequency: stage-arrival timeline + first trend chart",
+      "summary": "Merge pull request #177 from PersonalCorpAcc/sync/test-44781940361",
+      "commit": "521f826"
+    },
+    {
       "timestamp": "2026-09-19T07:52:23+01:00",
       "issue": 47,
       "title": "Adopt the design system: copy the components in and mount the provider",
