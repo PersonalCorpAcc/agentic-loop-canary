@@ -1,6 +1,14 @@
 import { describe, expect, it } from "vitest";
 
-import { buildFlow, cfdBuckets, classifyFlowStage, parsePeriod, replayFlowStageHistory, stageAt } from "./flow.js";
+import {
+  buildFlow,
+  cfdBuckets,
+  classifyFlowStage,
+  parsePeriod,
+  replayFlowStageHistory,
+  stageAt,
+  stageDurations,
+} from "./flow.js";
 import type { ApiIssue, ApiPullRequest, RepoSnapshot, TimelineEvent } from "./metrics.js";
 
 describe("classifying a flow stage off an issue's own labels", () => {
@@ -128,6 +136,41 @@ describe("replaying an issue's label timeline into a stage history", () => {
   });
 });
 
+describe("computing per-stage durations off a replayed history (#165)", () => {
+  it("is the gap to the next entry, or to now for the last one", () => {
+    const history = [
+      { stage: "specifying" as const, enteredAt: "2026-01-01T00:00:00Z" },
+      { stage: "building" as const, enteredAt: "2026-01-02T00:00:00Z" },
+      { stage: "deploying" as const, enteredAt: "2026-01-03T00:00:00Z" },
+    ];
+
+    const durations = stageDurations(history, "2026-01-04T00:00:00Z");
+
+    expect(durations.specifying).toBe(86_400_000);
+    expect(durations.building).toBe(86_400_000);
+    expect(durations.deploying).toBe(86_400_000);
+    expect(durations.backlog).toBe(0);
+    expect(durations.shipped).toBe(0);
+    const total = Object.values(durations).reduce((sum, ms) => sum + ms, 0);
+    expect(total).toBe(new Date("2026-01-04T00:00:00Z").getTime() - new Date("2026-01-01T00:00:00Z").getTime());
+  });
+
+  it("keeps an explicit 0 for a zero-gap entry instead of dropping it", () => {
+    const history = [
+      { stage: "specifying" as const, enteredAt: "2026-01-01T00:00:00Z" },
+      { stage: "needs-answers" as const, enteredAt: "2026-01-01T12:00:00Z" },
+      { stage: "specifying" as const, enteredAt: "2026-01-01T12:00:00Z" },
+      { stage: "building" as const, enteredAt: "2026-01-02T00:00:00Z" },
+    ];
+
+    const durations = stageDurations(history, "2026-01-02T00:00:00Z");
+
+    expect(durations["needs-answers"]).toBe(0);
+    expect(durations.specifying).toBe(86_400_000);
+    expect(durations.building).toBe(0);
+  });
+});
+
 describe("day-bucketing a CFD", () => {
   it("includes an explicit 0 for a stage with no items on a day", () => {
     const items = [
@@ -201,5 +244,26 @@ describe("building a flow result off a cached snapshot", () => {
     const snapshot = snapshotOf([issue({ number: 1, state: "closed" })]);
     const result = buildFlow(snapshot, { all: true }, new Date("2026-01-10T00:00:00Z"));
     expect(result.items[0]?.stage).toBe("shipped");
+  });
+
+  it("carries the resolved period window as from/to (#165)", () => {
+    const snapshot = snapshotOf([issue({ number: 1 })]);
+
+    const byDays = buildFlow(snapshot, { days: 7 }, new Date("2026-01-10T00:00:00Z"));
+    expect(byDays.to).toBe("2026-01-10T00:00:00.000Z");
+    expect(byDays.from).toBe("2026-01-03T00:00:00.000Z");
+
+    const all = buildFlow(snapshot, { all: true }, new Date("2026-01-10T00:00:00Z"));
+    expect(all.from).toBe(new Date("2026-01-01T00:00:00Z").toISOString());
+  });
+
+  it("attaches each item's stage durations, summing to its own lead time", () => {
+    const snapshot = snapshotOf([issue({ number: 1, created_at: "2026-01-01T00:00:00Z" })]);
+    const now = new Date("2026-01-04T00:00:00Z");
+
+    const result = buildFlow(snapshot, { days: 30 }, now);
+
+    const total = Object.values(result.items[0]?.durationsMs ?? {}).reduce((sum, ms) => sum + ms, 0);
+    expect(total).toBe(now.getTime() - new Date("2026-01-01T00:00:00Z").getTime());
   });
 });

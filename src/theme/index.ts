@@ -1,7 +1,7 @@
 import { createTheme } from "@mui/material/styles";
 
 import "./module-augmentation";
-import { palette } from "./palette";
+import { palette, darkPalette } from "./palette";
 import { typography } from "./typography";
 import { shape } from "./shape";
 import { shadows } from "./shadows";
@@ -15,6 +15,16 @@ import { components } from "./components";
  */
 export const theme = createTheme({
   palette,
+  typography,
+  shape,
+  shadows,
+  spacing: 4,
+  components,
+});
+
+/** Dark variant for the delivery dashboard shell (#142) — same tokens, `darkPalette`. */
+export const darkTheme = createTheme({
+  palette: darkPalette,
   typography,
   shape,
   shadows,
