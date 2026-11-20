@@ -2,6 +2,13 @@
   "changes": [
     {
       "timestamp": "2026-11-20T19:25:53Z",
+      "issue": 166,
+      "title": "Deployment pipeline graphic with soak timers",
+      "summary": "Record #161",
+      "commit": "05b54ec"
+    },
+    {
+      "timestamp": "2026-11-20T19:25:53Z",
       "issue": 161,
       "title": "Flow stage engine: label-driven classification, stage history and CFD day-buckets",
       "summary": "Record #145",
