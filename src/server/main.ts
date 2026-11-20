@@ -4,6 +4,7 @@ import { fileURLToPath } from "node:url";
 import { WebSocketServer } from "ws";
 
 import type { LoopEvent, LoopRun, Stage } from "../shared/types.js";
+import { loadDeploymentFrequency, periodDaysFor } from "./metrics/deploymentFrequency.js";
 import { listRuns } from "./runs.js";
 import { listStages } from "./stages.js";
 import { readBranchStrategy, readStageBranches } from "./strategy.js";
@@ -48,7 +49,25 @@ const stageBranches = ((): string[] => {
   }
 })();
 
+const PERIODS = ["7d", "30d", "90d"] as const;
+type Period = (typeof PERIODS)[number];
+
+function isPeriod(value: string | null): value is Period {
+  return PERIODS.includes(value as Period);
+}
+
 const server = createServer(async (request, response) => {
+  const url = new URL(request.url ?? "/", "http://localhost");
+
+  if (url.pathname === "/api/metrics/deployment-frequency") {
+    const requested = url.searchParams.get("period");
+    const period = isPeriod(requested) ? requested : "30d";
+    const result = await loadDeploymentFrequency(classifyRoutePath, periodDaysFor(period)).catch(() => undefined);
+    response.writeHead(result === undefined ? 404 : 200, { "content-type": "application/json" });
+    response.end(JSON.stringify(result ?? { error: "no stage chain configured" }));
+    return;
+  }
+
   if (request.url === "/api/runs") {
     const runs = await listRuns().catch(() => [] as LoopRun[]);
     response.writeHead(200, { "content-type": "application/json" });
