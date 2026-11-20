@@ -1,6 +1,13 @@
 {
   "changes": [
     {
+      "timestamp": "2026-11-20T19:25:54Z",
+      "issue": 142,
+      "title": "Delivery dashboard shell: dark theme, routing, nav rail, top bar",
+      "summary": "Record #149",
+      "commit": "c226185"
+    },
+    {
       "timestamp": "2026-11-20T19:25:53Z",
       "issue": 149,
       "title": "Loop page: activity trends",
