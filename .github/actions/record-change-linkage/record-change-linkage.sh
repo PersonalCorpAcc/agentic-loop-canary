@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Managed by @software-factory-dev/cli@0.5.1. Source: loops/actions/record-change-linkage/record-change-linkage.sh. Profile digest: a936a27c9791. Update with `workflows update --force`; consumer edits may be overwritten.
+# Managed by @software-factory-dev/cli@0.5.1. Source: loops/actions/record-change-linkage/record-change-linkage.sh. Profile digest: d048fc8f4fff. Update with `workflows update --force`; consumer edits may be overwritten.
 #
 # The authoritative link between an issue and its change is a comment this App wrote
 # (FR-064). A marker in a body is not: any human can type one invisibly, and a body is
