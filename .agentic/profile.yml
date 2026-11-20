@@ -136,9 +136,10 @@ branching:
   autoMerge:
     mode: always
     # The loop's own policy, and the coarser of the two halves: which stages it may merge
-    # into at all. `main` is absent deliberately -- production is a person's to land, and
-    # saying so here means the loop declines even where the forge would allow it.
-    targets: [dev, test]
+    # into at all. Full automation, production included (JC, 20/11/2026): a change that
+    # passes CI and the gate flows to main after each soak. Remove `main` to put a person
+    # back on production.
+    targets: [dev, test, main]
 
 # What the forge is asked to enforce, which is a different thing from what the loop does
 # (FR-085). Rendered by `workflows protection`, applied by a person, and checked by
@@ -151,11 +152,6 @@ protection:
   reviewers:
     # Three different gates, so that one repository shows all three shapes at once.
     #
-    # Production: everything stops for a person, whatever it touches. The environment is the
-    # criterion.
-    - team: agentic-team
-      approvals: 1
-      stages: [main]
     # Infrastructure: every stage, because a change to how this thing deploys is not made
     # unattended anywhere. The path is the criterion, and `deploy/**` is chosen over
     # `.github/**` because the latter is already in protectedFiles -- our own rule stops the
@@ -206,7 +202,9 @@ crons:
   # on it, so the gate is never dispatched and the change sits for ever. Observed on PR #37,
   # 18/09/2026, with every clock off.
   reconcileBotPrRuns: "17 * * * *"
-  promote: off
+  # On whenever a strategy promotes: a promotion that finds a soak still running stops, and
+  # only this clock asks again (the CLI refuses `off` here since 20/11/2026).
+  promote: "*/10 * * * *"
   syncStages: off
 
 constitution:

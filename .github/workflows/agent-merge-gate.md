@@ -1,5 +1,5 @@
 ---
-# Managed by @software-factory-dev/cli@0.5.1. Source: loops/workflows/agent-merge-gate.md. Profile digest: 049269cfb7da. Update with `workflows update --force`; consumer edits may be overwritten.
+# Managed by @software-factory-dev/cli@0.5.1. Source: loops/workflows/agent-merge-gate.md. Profile digest: a936a27c9791. Update with `workflows update --force`; consumer edits may be overwritten.
 env:
   VERIFY_COMMANDS: "pnpm install --frozen-lockfile && pnpm run build && pnpm run test"
   REPO_RULES: "Install with the lockfile frozen; an install that resolves a different tree is not reproducing the change under review. Run scripts through pnpm rather than npx, or a second package manager's lockfile appears in the diff."
@@ -30,7 +30,7 @@ env:
   # a human gate is branch protection plus somebody's judgement, not a sentence in a prompt
   # (FR-035, FR-036).
   AUTO_MERGE_MODE: "always"
-  AUTO_MERGE_TARGETS: "dev,test"
+  AUTO_MERGE_TARGETS: "dev,test,main"
   GATE_MARKER: "<!-- agent-merge-gate -->"
   ATTEMPT_MARKER: "<!-- agent-merge-gate-attempt -->"
   MAX_ATTEMPTS: "6"

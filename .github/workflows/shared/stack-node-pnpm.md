@@ -1,5 +1,5 @@
 ---
-# Managed by @software-factory-dev/cli@0.5.1. Source: loops/stacks/node-pnpm/pack.yml. Profile digest: 049269cfb7da. Update with `workflows update --force`; consumer edits may be overwritten.
+# Managed by @software-factory-dev/cli@0.5.1. Source: loops/stacks/node-pnpm/pack.yml. Profile digest: a936a27c9791. Update with `workflows update --force`; consumer edits may be overwritten.
 network:
   allowed:
     - defaults
