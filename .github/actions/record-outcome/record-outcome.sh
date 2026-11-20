@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Managed by @software-factory-dev/cli@0.5.1. Source: loops/actions/record-outcome/record-outcome.sh. Profile digest: a936a27c9791. Update with `workflows update --force`; consumer edits may be overwritten.
+# Managed by @software-factory-dev/cli@0.5.1. Source: loops/actions/record-outcome/record-outcome.sh. Profile digest: d048fc8f4fff. Update with `workflows update --force`; consumer edits may be overwritten.
 #
 # One line per job saying what happened and why (FR-058).
 #
@@ -65,6 +65,11 @@ readonly REASONS=(
   # and a hop that happened wrongly.
   timed-out
   assertion-failed
+  # The forge refused a token outright, or its API budget ran out. Both used to read as
+  # `timed-out` after an hour of polling an answer that was never coming (007 APP-03, QA-10);
+  # an expired key on the canary in 2026 looked like a quiet day for two months.
+  credential-refused
+  rate-limited
   budget-exhausted
   egress-blocked
   runner-offline
