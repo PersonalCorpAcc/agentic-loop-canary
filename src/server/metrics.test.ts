@@ -16,7 +16,10 @@ describe("the per-repository metrics cache", () => {
     let call = 0;
     const cache = new MetricsCache(["a/one"], async (repo) => {
       call += 1;
-      return { ...snapshotOf(repo), issues: [{ number: call, title: "t", state: "open", html_url: "", labels: [] }] };
+      return {
+        ...snapshotOf(repo),
+        issues: [{ number: call, title: "t", state: "open", html_url: "", labels: [], created_at: "2026-01-01T00:00:00Z", closed_at: null }],
+      };
     }, () => "fixed-time");
 
     await cache.refresh();

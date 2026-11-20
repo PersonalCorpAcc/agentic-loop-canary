@@ -31,6 +31,8 @@ export interface ApiIssue {
   readonly state: string;
   readonly html_url: string;
   readonly labels: readonly (string | { readonly name?: string })[];
+  readonly created_at: string;
+  readonly closed_at: string | null;
 }
 
 export interface ApiPullRequest {
@@ -39,6 +41,8 @@ export interface ApiPullRequest {
   readonly state: string;
   readonly html_url: string;
   readonly merged_at: string | null;
+  readonly body: string | null;
+  readonly labels: readonly (string | { readonly name?: string })[];
 }
 
 export interface ApiLabel {
@@ -47,12 +51,24 @@ export interface ApiLabel {
   readonly description: string | null;
 }
 
+/** One `labeled` / `unlabeled` timeline event -- the subset `flow.ts`'s history replay reads,
+ *  out of everything the timeline API reports. */
+export interface ApiTimelineEvent {
+  readonly event: string;
+  readonly label?: { readonly name?: string };
+  readonly created_at: string;
+}
+
 export interface RepoSnapshot {
   readonly repo: string;
   readonly issues: readonly ApiIssue[];
   readonly pullRequests: readonly ApiPullRequest[];
   readonly labels: readonly ApiLabel[];
   readonly runs: readonly LoopRun[];
+  /** Every issue's full timeline, fetched alongside the rest of the snapshot so `/api/flow`
+   *  never has to reach the forge itself. Optional so a snapshot built before this story --
+   *  or a test fixture that does not need it -- is still a valid `RepoSnapshot`. */
+  readonly issueTimelines?: Record<number, readonly ApiTimelineEvent[]>;
 }
 
 /** One cache entry: a repository's last successful snapshot, or a failed marker that leaves
@@ -88,6 +104,34 @@ async function listLabels(repo: string): Promise<ApiLabel[]> {
   });
   if (!response.ok) throw new Error(`the forge answered ${response.status} for ${repo} labels`);
   return response.json() as Promise<ApiLabel[]>;
+}
+
+/** An issue's full timeline, every page drained before returning -- replaying off a partial
+ *  history would silently misclassify whatever events landed on a later page. */
+async function listIssueTimeline(repo: string, issueNumber: number): Promise<ApiTimelineEvent[]> {
+  const events: ApiTimelineEvent[] = [];
+  for (let page = 1; ; page += 1) {
+    const response = await fetch(
+      `https://api.github.com/repos/${repo}/issues/${issueNumber}/timeline?per_page=100&page=${page}`,
+      { headers: headers() },
+    );
+    if (!response.ok) throw new Error(`the forge answered ${response.status} for ${repo}#${issueNumber} timeline`);
+    const body = await response.json() as ApiTimelineEvent[];
+    events.push(...body);
+    if (body.length < 100) break;
+  }
+  return events;
+}
+
+/** Every configured issue's timeline, keyed by issue number. One issue's failure is tolerated
+ *  on its own -- same per-entry tolerance `MetricsCache` already applies per repository -- so
+ *  a single forge hiccup does not drop the rest of the snapshot's timelines. */
+async function timelinesOf(repo: string, issues: readonly ApiIssue[]): Promise<Record<number, readonly ApiTimelineEvent[]>> {
+  const entries = await Promise.all(issues.map(async (issue) => {
+    const events = await listIssueTimeline(repo, issue.number).catch(() => [] as ApiTimelineEvent[]);
+    return [issue.number, events] as const;
+  }));
+  return Object.fromEntries(entries);
 }
 
 /** The first job of a run -- the only one the loop's own workflows ever schedule -- or
@@ -136,7 +180,8 @@ export async function fetchRepoSnapshot(repo: string): Promise<RepoSnapshot> {
     listLabels(repo),
     runsWithOutcome(repo),
   ]);
-  return { repo, issues, pullRequests, labels, runs };
+  const issueTimelines = await timelinesOf(repo, issues);
+  return { repo, issues, pullRequests, labels, runs, issueTimelines };
 }
 
 export type SnapshotFetcher = (repo: string) => Promise<RepoSnapshot>;
