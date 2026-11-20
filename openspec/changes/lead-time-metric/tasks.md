@@ -121,28 +121,28 @@ Scope decisions, made so implementation does not re-litigate them:
 
 ## 4. Wiring: Overview (stat tile + sparkline) and Delivery (trend chart + table)
 
-- [ ] 4.1 Add `src/web/leadTime.ts` (pure, browser-safe, type-only import from
+- [x] 4.1 Add `src/web/leadTime.ts` (pure, browser-safe, type-only import from
       `../server/metrics/leadTime.js`): a thin `formatLeadTimeDays(days: number): string`
       (one decimal place, e.g. `"2.3d"`) helper only — the fetched `LeadTimeResult` JSON
       already has everything else a page needs; do not duplicate `computeLeadTime` here.
-- [ ] 4.2 Wire `src/web/pages/Overview.tsx` (currently just `<PageHeader title="Overview" />`,
+- [x] 4.2 Wire `src/web/pages/Overview.tsx` (currently just `<PageHeader title="Overview" />`,
       per its own comment, waiting for a sibling story to build something): fetch
       `/api/repo` then `/api/lead-time?repo=&period=` (same two-effect pattern
       `Delivery.tsx` already uses for `/api/flow`), and render a `Section` containing a
       `StatTile` (`label="Lead time"`, `value={formatLeadTimeDays(result.medianDays)}` or
       an em dash when `medianDays` is `undefined`, `sub={<Sparkline points={result.dailyMedians.map(d => d.medianDays)} />}`).
-- [ ] 4.3 Wire `src/web/pages/Delivery.tsx`: alongside the existing "Where time goes" and
+- [x] 4.3 Wire `src/web/pages/Delivery.tsx`: alongside the existing "Where time goes" and
       "Waiting on a person" sections, fetch `/api/lead-time` the same way (reuse the
       `repo`/`period` state already in this component) and add a "Lead time" `Section`
       containing a `TrendChart` of `dailyMedians` plus a `DataTable` of `entries`
       (columns: issue link via `<a href={entry.url}>` — the same plain-anchor convention
       `loopTable.ts`/`WaitingOnPersonList` use for external GitHub links, title, merged
       date, lead time days formatted via `formatLeadTimeDays`).
-- [ ] 4.4 Add `src/web/leadTime.test.ts` for `formatLeadTimeDays` (a couple of fixed
+- [x] 4.4 Add `src/web/leadTime.test.ts` for `formatLeadTimeDays` (a couple of fixed
       values, including the one-decimal rounding boundary).
 
 ## 5. Verification
 
-- [ ] 5.1 `pnpm run typecheck && pnpm run test && pnpm run build` passes with no new
+- [x] 5.1 `pnpm run typecheck && pnpm run test && pnpm run build` passes with no new
       lint/type errors, and no new colour literal or direct `palette.status` access was
       introduced (Rule 2/3).
