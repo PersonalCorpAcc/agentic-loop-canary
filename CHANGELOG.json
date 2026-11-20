@@ -1,6 +1,13 @@
 {
   "changes": [
     {
+      "timestamp": "2026-11-20T20:18:41Z",
+      "issue": 142,
+      "title": "Delivery dashboard shell: dark theme, routing, nav rail, top bar",
+      "summary": "Merge pull request #208 from PersonalCorpAcc/sync/test-44809958710",
+      "commit": "17a1c25"
+    },
+    {
       "timestamp": "2026-11-20T19:25:54Z",
       "issue": 148,
       "title": "Loop page: recent activity table",
