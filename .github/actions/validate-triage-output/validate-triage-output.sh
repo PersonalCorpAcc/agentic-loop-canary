@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Managed by @software-factory-dev/cli@0.5.1. Source: loops/actions/validate-triage-output/validate-triage-output.sh. Profile digest: 049269cfb7da. Update with `workflows update --force`; consumer edits may be overwritten.
+# Managed by @software-factory-dev/cli@0.5.1. Source: loops/actions/validate-triage-output/validate-triage-output.sh. Profile digest: d048fc8f4fff. Update with `workflows update --force`; consumer edits may be overwritten.
 # Print the deterministic triage outcome: pass, needs-info, block, or invalid.
 
 set -euo pipefail

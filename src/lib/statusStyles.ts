@@ -18,6 +18,7 @@
  */
 
 import type { Outcome } from "../shared/types.js";
+import type { FlowStageName } from "../server/flow.js";
 
 export type Tone = "ok" | "warn" | "err" | "info" | "neutral";
 
@@ -58,12 +59,26 @@ export const LOOP_STYLES: Record<LoopOutcomeState, StatusStyle> = {
   unknown: { tone: "info", icon: "?", label: "Unknown" },
 };
 
-export type Kind = "job" | "stage" | "loop";
-export type StateValue = JobState | StageState | LoopOutcomeState;
+// ---- flow: the 9-stage delivery pipeline a flow item currently sits in (#165) ---------------
+export const FLOW_STYLES: Record<FlowStageName, StatusStyle> = {
+  backlog: { tone: "neutral", icon: "•", label: "Backlog" },
+  specifying: { tone: "info", icon: "◐", label: "Specifying" },
+  "needs-answers": { tone: "warn", icon: "?", label: "Needs answers" },
+  ready: { tone: "neutral", icon: "•", label: "Ready" },
+  building: { tone: "info", icon: "◐", label: "Building" },
+  validating: { tone: "info", icon: "◐", label: "Validating" },
+  "awaiting-review": { tone: "warn", icon: "◐", label: "Awaiting review" },
+  deploying: { tone: "ok", icon: "◐", label: "Deploying" },
+  shipped: { tone: "ok", icon: "✓", label: "Shipped" },
+};
+
+export type Kind = "job" | "stage" | "loop" | "flow";
+export type StateValue = JobState | StageState | LoopOutcomeState | FlowStageName;
 
 export function styleFor(kind: "job", state: JobState): StatusStyle;
 export function styleFor(kind: "stage", state: StageState): StatusStyle;
 export function styleFor(kind: "loop", state: LoopOutcomeState): StatusStyle;
+export function styleFor(kind: "flow", state: FlowStageName): StatusStyle;
 export function styleFor(kind: Kind, state: StateValue): StatusStyle;
 export function styleFor(kind: Kind, state: StateValue): StatusStyle {
   switch (kind) {
@@ -73,5 +88,7 @@ export function styleFor(kind: Kind, state: StateValue): StatusStyle {
       return STAGE_STYLES[state as StageState];
     case "loop":
       return LOOP_STYLES[state as LoopOutcomeState];
+    case "flow":
+      return FLOW_STYLES[state as FlowStageName];
   }
 }

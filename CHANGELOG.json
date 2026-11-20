@@ -1,25 +1,144 @@
 {
   "changes": [
     {
-      "timestamp": "2026-09-19T07:52:23+01:00",
-      "issue": 47,
-      "title": "Adopt the design system: copy the components in and mount the provider",
-      "summary": "Carry the release push fix to main",
-      "commit": "e31221b"
+      "timestamp": "2026-11-20T22:25:53Z",
+      "issue": 145,
+      "title": "Change failure rate and time to restore, as tiles and trend charts",
+      "summary": "Record #144",
+      "commit": "dfa0c7d"
     },
     {
-      "timestamp": "2026-09-18T19:39:22Z",
-      "issue": 47,
-      "title": "Adopt the design system: copy the components in and mount the provider",
-      "summary": "Copy the RiskPoint theme kit into src/ and mount the provider",
-      "commit": "1332871"
+      "timestamp": "2026-11-20T22:20:45Z",
+      "issue": 144,
+      "title": "Lead time: implement label to merged-main, as a tile and trend chart",
+      "summary": "Merge pull request #220 from PersonalCorpAcc/sync/test-44828001650",
+      "commit": "175106c"
     },
     {
-      "timestamp": "2026-09-17T20:00:17Z",
-      "issue": 8,
-      "title": "Add Sort for version slices",
-      "summary": "Add internal/semver package with Sort for version slices",
-      "commit": "d2714a3"
+      "timestamp": "2026-11-20T21:25:27Z",
+      "issue": 144,
+      "title": "Lead time: implement label to merged-main, as a tile and trend chart",
+      "summary": "Record #164",
+      "commit": "7f8e81f"
+    },
+    {
+      "timestamp": "2026-11-20T21:25:27Z",
+      "issue": 164,
+      "title": "Throughput and lead-time trend charts",
+      "summary": "Record #207",
+      "commit": "fe6cae8"
+    },
+    {
+      "timestamp": "2026-11-20T21:25:26Z",
+      "issue": 207,
+      "title": "Server: authenticate as a GitHub App and respect GitHub's rate limit",
+      "summary": "Record #162",
+      "commit": "9bdcc1e"
+    },
+    {
+      "timestamp": "2026-11-20T21:06:18Z",
+      "issue": 162,
+      "title": "Flow strip hero cards + work item table + TV mode",
+      "summary": "Merge pull request #215 from PersonalCorpAcc/sync/test-44817090573",
+      "commit": "336abc2"
+    },
+    {
+      "timestamp": "2026-11-20T20:24:44Z",
+      "issue": 165,
+      "title": "Time-in-stage breakdown and the \"waiting on a person\" list",
+      "summary": "Record #144",
+      "commit": "7a44e8e"
+    },
+    {
+      "timestamp": "2026-11-20T20:24:44Z",
+      "issue": 144,
+      "title": "Lead time: implement label to merged-main, as a tile and trend chart",
+      "summary": "Record #142",
+      "commit": "2b62646"
+    },
+    {
+      "timestamp": "2026-11-20T20:18:41Z",
+      "issue": 142,
+      "title": "Delivery dashboard shell: dark theme, routing, nav rail, top bar",
+      "summary": "Merge pull request #208 from PersonalCorpAcc/sync/test-44809958710",
+      "commit": "17a1c25"
+    },
+    {
+      "timestamp": "2026-11-20T19:25:54Z",
+      "issue": 148,
+      "title": "Loop page: recent activity table",
+      "summary": "Record #154",
+      "commit": "e03b9de"
+    },
+    {
+      "timestamp": "2026-11-20T19:25:54Z",
+      "issue": 154,
+      "title": "Metrics API: cached issues, pull requests, labels, runs and outcome lines across repositories",
+      "summary": "Record #142",
+      "commit": "8bc875b"
+    },
+    {
+      "timestamp": "2026-11-20T19:25:54Z",
+      "issue": 142,
+      "title": "Delivery dashboard shell: dark theme, routing, nav rail, top bar",
+      "summary": "Record #149",
+      "commit": "c226185"
+    },
+    {
+      "timestamp": "2026-11-20T19:25:53Z",
+      "issue": 149,
+      "title": "Loop page: activity trends",
+      "summary": "Record #166",
+      "commit": "def238b"
+    },
+    {
+      "timestamp": "2026-11-20T19:25:53Z",
+      "issue": 166,
+      "title": "Deployment pipeline graphic with soak timers",
+      "summary": "Record #161",
+      "commit": "05b54ec"
+    },
+    {
+      "timestamp": "2026-11-20T19:25:53Z",
+      "issue": 161,
+      "title": "Flow stage engine: label-driven classification, stage history and CFD day-buckets",
+      "summary": "Record #145",
+      "commit": "c5b7df6"
+    },
+    {
+      "timestamp": "2026-11-20T19:25:53Z",
+      "issue": 145,
+      "title": "Change failure rate and time to restore, as tiles and trend charts",
+      "summary": "Record #143",
+      "commit": "6bf67c5"
+    },
+    {
+      "timestamp": "2026-11-20T18:58:47Z",
+      "issue": 143,
+      "title": "Deployment frequency: stage-arrival timeline + first trend chart",
+      "summary": "Merge pull request #195 from PersonalCorpAcc/sync/test-44797637236",
+      "commit": "be10e0e"
+    },
+    {
+      "timestamp": "2026-11-20T18:25:08Z",
+      "issue": 149,
+      "title": "Loop page: activity trends",
+      "summary": "Record #166",
+      "commit": "a0d532c"
+    },
+    {
+      "timestamp": "2026-11-20T18:25:08Z",
+      "issue": 166,
+      "title": "Deployment pipeline graphic with soak timers",
+      "summary": "Record #161",
+      "commit": "4f0a2d2"
+    },
+    {
+      "timestamp": "2026-11-20T18:25:08Z",
+      "issue": 161,
+      "title": "Flow stage engine: label-driven classification, stage history and CFD day-buckets",
+      "summary": "Record #145",
+      "commit": "b63a2cc"
     }
   ]
 }

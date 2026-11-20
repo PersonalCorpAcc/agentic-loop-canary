@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Managed by @software-factory-dev/cli@0.5.1. Source: loops/actions/classify-route/classify-route.sh. Profile digest: 049269cfb7da. Update with `workflows update --force`; consumer edits may be overwritten.
+# Managed by @software-factory-dev/cli@0.5.1. Source: loops/actions/classify-route/classify-route.sh. Profile digest: d048fc8f4fff. Update with `workflows update --force`; consumer edits may be overwritten.
 # Classify one GitHub event into exactly one route. Pure: no network, no gh calls, so
 # verify-route-matrix.sh can source this file and exercise the same code the router runs.
 #
@@ -43,6 +43,7 @@ readonly RECONCILE_BOT_PR_RUNS_CRON="17 * * * *"
 # The fifth clock, and the only one a profile can switch off: a trunk repository has no
 # later stage to promote into, so the projector writes no value and this line disappears
 # with it (FR-031).
+readonly PROMOTE_CRON="*/10 * * * *"
 # The sixth, and switched off by the same fact: a repository with one branch has no stage
 # that can fall behind another, so there is nothing to carry back down (FR-079).
 

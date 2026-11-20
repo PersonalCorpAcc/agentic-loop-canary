@@ -2,18 +2,20 @@ import { useEffect, useMemo, useState, type ReactElement } from "react";
 
 import { StatusBadge } from "@/components/primitives";
 
-import type { LoopEvent, LoopRun, Stage } from "../shared/types.js";
-import { needsAttention } from "../shared/types.js";
-import { formatCountdown, liveRemainingSeconds } from "./pipeline.js";
+import type { LoopEvent, LoopRun, Stage } from "../../shared/types.js";
+import { needsAttention } from "../../shared/types.js";
+import { formatCountdown, liveRemainingSeconds } from "../pipeline.js";
 
 /**
- * What the loop is doing, now.
+ * What the loop is doing, now — retired from the root route behind `/loop`
+ * by #142, which gave the app a routed shell; #139's other children design
+ * whatever eventually replaces it.
  *
  * The ordering rule is the whole design: anything that asked for a person comes first, then
  * whatever is still running, then history. A dashboard that sorts by time alone buries the
  * one row a person has to act on under forty rows of housekeeping.
  */
-export function App(): ReactElement {
+export function Log(): ReactElement {
   const [runs, setRuns] = useState<readonly LoopRun[]>([]);
   const [live, setLive] = useState(false);
   const [strategy, setStrategy] = useState<string | null>(null);
