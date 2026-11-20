@@ -89,12 +89,12 @@ export const components: Components<Omit<Theme, "components">> = {
       }),
       containedPrimary: ({ theme }) => ({
         backgroundColor: theme.palette.brand.main,
-        color: theme.palette.common.white,
+        color: theme.palette.brand.contrastText,
         "&:hover": { backgroundColor: theme.palette.brand.dark },
         "&:active": { backgroundColor: theme.palette.brand.dark },
         "&.Mui-disabled": {
           backgroundColor: theme.palette.brand.main,
-          color: theme.palette.common.white,
+          color: theme.palette.brand.contrastText,
           opacity: 0.6,
         },
       }),
@@ -190,7 +190,7 @@ export const components: Components<Omit<Theme, "components">> = {
     styleOverrides: {
       tooltip: ({ theme }) => ({
         backgroundColor: theme.palette.brand.main,
-        color: theme.palette.common.white,
+        color: theme.palette.brand.contrastText,
         fontSize: "0.75rem",
         fontWeight: 500,
         padding: "6px 8px",
@@ -233,7 +233,7 @@ export const components: Components<Omit<Theme, "components">> = {
         "&.Mui-selected": {
           backgroundColor: theme.palette.brand.main,
           borderColor: theme.palette.brand.main,
-          color: theme.palette.common.white,
+          color: theme.palette.brand.contrastText,
         },
       }),
     },
@@ -249,7 +249,7 @@ export const components: Components<Omit<Theme, "components">> = {
         backgroundColor: theme.palette.background.paper,
         "&.Mui-selected": {
           backgroundColor: theme.palette.brand.main,
-          color: theme.palette.common.white,
+          color: theme.palette.brand.contrastText,
           "&:hover": { backgroundColor: theme.palette.brand.dark },
         },
       }),

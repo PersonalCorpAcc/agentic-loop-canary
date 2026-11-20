@@ -6,7 +6,7 @@ import { styleFor } from "@/lib/statusStyles";
 
 import { describe } from "../shared/outcome-line.js";
 import type { LoopRun } from "../shared/types.js";
-import { issueUrl } from "./App.js";
+import { issueUrl } from "./pages/Log.js";
 
 /**
  * The Loop page's recent-activity table, as a pure mapping from `LoopRun[]` to `DataTable`'s
