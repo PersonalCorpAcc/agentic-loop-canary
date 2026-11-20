@@ -1,4 +1,4 @@
-// Managed by @plainconceptsplatform/workflows@0.5.1. Source: loops/actions/agent-output.cjs. Profile digest: f67d7ff379d7. Update with `workflows update --force`; consumer edits may be overwritten.
+// Managed by @software-factory-dev/cli@0.5.1. Source: loops/actions/agent-output.cjs. Profile digest: b4bdd2d76a31. Update with `workflows update --force`; consumer edits may be overwritten.
 const fs = require('node:fs');
 
 // Every apply-agent-* action reads the same artifact the same way: a missing file means the
