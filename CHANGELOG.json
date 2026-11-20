@@ -2,6 +2,13 @@
   "changes": [
     {
       "timestamp": "2026-11-20T19:25:54Z",
+      "issue": 148,
+      "title": "Loop page: recent activity table",
+      "summary": "Record #154",
+      "commit": "e03b9de"
+    },
+    {
+      "timestamp": "2026-11-20T19:25:54Z",
       "issue": 154,
       "title": "Metrics API: cached issues, pull requests, labels, runs and outcome lines across repositories",
       "summary": "Record #142",
