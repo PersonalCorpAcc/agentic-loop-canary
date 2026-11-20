@@ -14,7 +14,7 @@ import { needsAttention } from "../../shared/types.js";
  * whatever is still running, then history. A dashboard that sorts by time alone buries the
  * one row a person has to act on under forty rows of housekeeping.
  */
-export function Loop(): ReactElement {
+export function Log(): ReactElement {
   const [runs, setRuns] = useState<readonly LoopRun[]>([]);
   const [live, setLive] = useState(false);
   const [strategy, setStrategy] = useState<string | null>(null);

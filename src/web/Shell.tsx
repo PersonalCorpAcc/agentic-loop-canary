@@ -21,7 +21,7 @@ interface NavEntry {
 const NAV_ENTRIES: readonly NavEntry[] = [
   { label: "Overview", path: "/" },
   { label: "Delivery", path: "/delivery" },
-  { label: "Loop", path: "/loop" },
+  { label: "Log", path: "/log" },
 ];
 
 /** The dashboard shell (#142): a dark nav rail on the left, a top bar (watched repository +
