@@ -1,4 +1,4 @@
-# Managed by @software-factory-dev/cli@0.5.1. Source: loops/workflows/work-router.yml. Profile digest: 049269cfb7da. Update with `workflows update --force`; consumer edits may be overwritten.
+# Managed by @software-factory-dev/cli@0.5.1. Source: loops/workflows/work-router.yml. Profile digest: a936a27c9791. Update with `workflows update --force`; consumer edits may be overwritten.
 name: "All Work Router"
 
 # Owns every repository automation trigger. Classifies each event into exactly one route,
@@ -125,6 +125,7 @@ on:
     # nothing answers to. Silencing used to be a hand edit that every reinstall undid without
     # saying so (FR-081).
     - cron: "17 * * * *"
+    - cron: "*/10 * * * *" # promotion; the line goes where there is nowhere to promote into (FR-031)
 
   workflow_dispatch:
     inputs:
@@ -1849,7 +1850,7 @@ jobs:
         with:
           token: ${{ steps.app-token.outputs.token }}
           auto-merge-mode: "always"
-          auto-merge-targets: "dev,test"
+          auto-merge-targets: "dev,test,main"
       - name: Record the outcome
         if: always()
         uses: ./.github/actions/record-outcome
