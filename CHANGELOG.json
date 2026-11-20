@@ -2,6 +2,13 @@
   "changes": [
     {
       "timestamp": "2026-11-20T18:25:08Z",
+      "issue": 149,
+      "title": "Loop page: activity trends",
+      "summary": "Record #166",
+      "commit": "a0d532c"
+    },
+    {
+      "timestamp": "2026-11-20T18:25:08Z",
       "issue": 166,
       "title": "Deployment pipeline graphic with soak timers",
       "summary": "Record #161",
