@@ -30,6 +30,7 @@ export interface ApiIssue {
   readonly title: string;
   readonly state: string;
   readonly html_url: string;
+  readonly created_at: string;
   readonly labels: readonly (string | { readonly name?: string })[];
 }
 
@@ -39,6 +40,8 @@ export interface ApiPullRequest {
   readonly state: string;
   readonly html_url: string;
   readonly merged_at: string | null;
+  readonly body: string | null;
+  readonly labels: readonly (string | { readonly name?: string })[];
 }
 
 export interface ApiLabel {
@@ -47,12 +50,22 @@ export interface ApiLabel {
   readonly description: string | null;
 }
 
+/** One entry off an issue's `GET /issues/{n}/timeline`, narrowed to the fields a flow-stage
+ *  replay (#161) reads: which event, when, and -- for `labeled` / `unlabeled` -- which
+ *  label. Every other event shape the forge returns is passed through untouched. */
+export interface TimelineEvent {
+  readonly event: string;
+  readonly created_at?: string;
+  readonly label?: { readonly name?: string };
+}
+
 export interface RepoSnapshot {
   readonly repo: string;
   readonly issues: readonly ApiIssue[];
   readonly pullRequests: readonly ApiPullRequest[];
   readonly labels: readonly ApiLabel[];
   readonly runs: readonly LoopRun[];
+  readonly issueTimelines: Record<number, readonly TimelineEvent[]>;
 }
 
 /** One cache entry: a repository's last successful snapshot, or a failed marker that leaves
@@ -127,6 +140,34 @@ async function runsWithOutcome(repo: string): Promise<LoopRun[]> {
   }));
 }
 
+/** One issue's full timeline, oldest first -- drained past the forge's 100-per-page cap
+ *  before a flow-stage replay (#161) ever sees it, since a label changed on page 2 is as
+ *  real as one on page 1. */
+async function fetchIssueTimeline(repo: string, issueNumber: number): Promise<TimelineEvent[]> {
+  const events: TimelineEvent[] = [];
+  for (let page = 1; ; page += 1) {
+    const response = await fetch(
+      `https://api.github.com/repos/${repo}/issues/${issueNumber}/timeline?per_page=100&page=${page}`,
+      { headers: { ...headers(), accept: "application/vnd.github+json" } },
+    );
+    if (!response.ok) throw new Error(`the forge answered ${response.status} for ${repo}#${issueNumber} timeline`);
+    const body = await response.json() as TimelineEvent[];
+    events.push(...body);
+    if (body.length < 100) break;
+  }
+  return events;
+}
+
+/** Every open or closed issue's timeline, keyed by issue number -- the per-issue label
+ *  history a flow-stage replay (#161) needs, fetched alongside the rest of the snapshot so
+ *  `/api/flow` never has to make its own forge call. */
+async function fetchIssueTimelines(repo: string, issues: readonly ApiIssue[]): Promise<Record<number, readonly TimelineEvent[]>> {
+  const entries = await Promise.all(
+    issues.map(async (issue) => [issue.number, await fetchIssueTimeline(repo, issue.number)] as const),
+  );
+  return Object.fromEntries(entries);
+}
+
 /** Every piece of one repository's snapshot, fetched fresh. The only function in this module
  *  that talks to the forge for more than a single repository's one resource. */
 export async function fetchRepoSnapshot(repo: string): Promise<RepoSnapshot> {
@@ -136,7 +177,8 @@ export async function fetchRepoSnapshot(repo: string): Promise<RepoSnapshot> {
     listLabels(repo),
     runsWithOutcome(repo),
   ]);
-  return { repo, issues, pullRequests, labels, runs };
+  const issueTimelines = await fetchIssueTimelines(repo, issues);
+  return { repo, issues, pullRequests, labels, runs, issueTimelines };
 }
 
 export type SnapshotFetcher = (repo: string) => Promise<RepoSnapshot>;
