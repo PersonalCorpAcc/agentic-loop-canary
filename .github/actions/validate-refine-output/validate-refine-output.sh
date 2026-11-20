@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Managed by @software-factory-dev/cli@0.5.1. Source: loops/actions/validate-refine-output/validate-refine-output.sh. Profile digest: a936a27c9791. Update with `workflows update --force`; consumer edits may be overwritten.
+# Managed by @software-factory-dev/cli@0.5.1. Source: loops/actions/validate-refine-output/validate-refine-output.sh. Profile digest: d048fc8f4fff. Update with `workflows update --force`; consumer edits may be overwritten.
 # Print the deterministic Refine outcome: complete, split, questions, or invalid.
 
 set -euo pipefail
