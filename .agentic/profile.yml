@@ -100,7 +100,7 @@ branching:
   #
   # A concurrency group cannot express "at most N", so this selects the shape rather than a
   # limit: above 1 the ceiling is the runner fleet, not this number.
-  concurrentImplements: 4
+  concurrentImplements: 2
   # `merge`, which is this strategy's conventional method and is a mechanic rather than a
   # taste. A promotion head here is a snapshot of `dev`, and only a merge commit leaves that
   # snapshot an ancestor of `test`. Under `squash` -- which this repository ran until
