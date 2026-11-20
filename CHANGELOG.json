@@ -1,6 +1,13 @@
 {
   "changes": [
     {
+      "timestamp": "2026-11-20T18:58:47Z",
+      "issue": 143,
+      "title": "Deployment frequency: stage-arrival timeline + first trend chart",
+      "summary": "Merge pull request #195 from PersonalCorpAcc/sync/test-44797637236",
+      "commit": "be10e0e"
+    },
+    {
       "timestamp": "2026-11-20T18:25:08Z",
       "issue": 149,
       "title": "Loop page: activity trends",
