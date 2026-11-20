@@ -1,4 +1,5 @@
 import type { LoopRun } from "../shared/types.js";
+import { reposOf } from "./repos.js";
 
 /**
  * The loop's runs, from the forge.
@@ -12,7 +13,7 @@ import type { LoopRun } from "../shared/types.js";
  * knows -- route, timing, conclusion -- and an issue tracks the rest.
  */
 
-const repo = process.env["LOOP_REPO"] ?? "PersonalCorpAcc/agentic-loop-canary";
+const defaultRepo = reposOf()[0]!;
 const token = process.env["GH_TOKEN"] ?? process.env["GITHUB_TOKEN"] ?? "";
 
 interface ApiRun {
@@ -68,7 +69,7 @@ export function carriedIssuesOf(body: string): number[] {
   return [...seen];
 }
 
-async function fetchPullRequestBody(number: number): Promise<string | undefined> {
+async function fetchPullRequestBody(repo: string, number: number): Promise<string | undefined> {
   const response = await fetch(`https://api.github.com/repos/${repo}/pulls/${number}`, {
     headers: {
       accept: "application/vnd.github+json",
@@ -81,7 +82,7 @@ async function fetchPullRequestBody(number: number): Promise<string | undefined>
   return body.body ?? "";
 }
 
-export async function listRuns(limit = 50): Promise<LoopRun[]> {
+export async function listRuns(limit = 50, repo = defaultRepo): Promise<LoopRun[]> {
   const response = await fetch(`https://api.github.com/repos/${repo}/actions/runs?per_page=${limit}`, {
     headers: {
       accept: "application/vnd.github+json",
@@ -112,7 +113,7 @@ export async function listRuns(limit = 50): Promise<LoopRun[]> {
   // the stage-merge that follows it -- can name the same one.
   const numbers = [...new Set(runs.map(pullRequestNumberOf).filter((n) => n !== undefined))];
   const bodies = new Map(
-    (await Promise.all(numbers.map(async (n) => [n, await fetchPullRequestBody(n)] as const)))
+    (await Promise.all(numbers.map(async (n) => [n, await fetchPullRequestBody(repo, n)] as const)))
       .filter(([, body]) => body !== undefined),
   );
 
