@@ -4,6 +4,7 @@ import { StatusBadge } from "@/components/primitives";
 
 import type { LoopEvent, LoopRun, Stage } from "../../shared/types.js";
 import { needsAttention } from "../../shared/types.js";
+import { formatCountdown, liveRemainingSeconds } from "../pipeline.js";
 
 /**
  * What the loop is doing, now — retired from the root route behind `/loop`
@@ -19,6 +20,8 @@ export function Log(): ReactElement {
   const [live, setLive] = useState(false);
   const [strategy, setStrategy] = useState<string | null>(null);
   const [stages, setStages] = useState<readonly Stage[]>([]);
+  const [stagesFetchedAt, setStagesFetchedAt] = useState(() => Date.now());
+  const [now, setNow] = useState(() => Date.now());
 
   useEffect(() => {
     const socket = new WebSocket(socketUrl(location));
@@ -47,12 +50,22 @@ export function Log(): ReactElement {
     const fetchStages = (): void => {
       fetch("/api/stages")
         .then((response) => response.json() as Promise<Stage[]>)
-        .then(setStages)
+        .then((body) => {
+          setStages(body);
+          setStagesFetchedAt(Date.now());
+        })
         .catch(() => setStages([]));
     };
     fetchStages();
     const interval = setInterval(fetchStages, 30_000);
     return () => clearInterval(interval);
+  }, []);
+
+  useEffect(() => {
+    // Live countdowns tick between the 30s polls above; this is the resync point, not a
+    // source of new data.
+    const tick = setInterval(() => setNow(Date.now()), 1_000);
+    return () => clearInterval(tick);
   }, []);
 
   const ordered = useMemo(() => [...runs].sort(compareRuns), [runs]);
@@ -69,12 +82,25 @@ export function Log(): ReactElement {
         </p>
       </header>
       {stages.length > 0 && (
-        <section aria-label="stages">
-          <ol>
+        <section aria-label="pipeline">
+          <ol style={{ display: "flex", gap: "0.75rem", listStyle: "none", padding: 0, margin: 0 }}>
             {stages.map((stage) => (
-              <li key={stage.name} data-frozen={stage.frozen}>
+              <li
+                key={stage.name}
+                data-frozen={stage.frozen}
+                style={{ flex: 1, border: "1px solid", borderRadius: "0.25rem", padding: "0.5rem" }}
+              >
                 <span>{stage.name}</span>
-                {stage.frozen && (
+                {stage.items.length > 0 && (
+                  <ul>
+                    {stage.items.map((item) => (
+                      <li key={item.issue}>
+                        <a href={item.url}>#{item.issue}</a>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+                {stage.frozen ? (
                   <>
                     <StatusBadge kind="stage" state="frozen" />
                     <span>
@@ -86,6 +112,14 @@ export function Log(): ReactElement {
                       ))}
                     </span>
                   </>
+                ) : (
+                  stage.soak && (
+                    <p>
+                      Promotes in{" "}
+                      {formatCountdown(liveRemainingSeconds(stage.soak.remainingSeconds, stagesFetchedAt, now))} (at{" "}
+                      <time dateTime={stage.soak.completesAt}>{new Date(stage.soak.completesAt).toLocaleTimeString()}</time>)
+                    </p>
+                  )
                 )}
               </li>
             ))}

@@ -49,10 +49,23 @@ export interface StageBlock {
  * every issue currently doing that; a stage with none is not frozen, and the last stage in
  * the chain -- which nothing promotes out of -- is never frozen.
  */
+/** How long is left before a stage's newest eligible merge can promote onward. */
+export interface StageSoak {
+  readonly remainingSeconds: number;
+  /** The wall-clock time the soak completes: `now + remainingSeconds`. */
+  readonly completesAt: string;
+}
+
 export interface Stage {
   readonly name: string;
   readonly frozen: boolean;
   readonly blockedBy: readonly StageBlock[];
+  /** Every issue currently merged onto this stage and not yet promoted past it, whether or
+   *  not it is one of `blockedBy`. Empty where nothing is waiting. */
+  readonly items: readonly { readonly issue: number; readonly url: string }[];
+  /** Present only when a change is soaking toward promotion and the stage is not frozen --
+   *  a countdown that could never complete reads as a bug, not a status. */
+  readonly soak?: StageSoak;
 }
 
 /** What the server pushes over the socket as runs begin and end. */

@@ -11,7 +11,7 @@ import { computeLeadTime } from "./metrics/leadTime.js";
 import { reposOf } from "./repos.js";
 import { listRuns } from "./runs.js";
 import { listStages } from "./stages.js";
-import { readBranchStrategy, readStageBranches } from "./strategy.js";
+import { readBranchStrategy, readStageBranches, soakOf } from "./strategy.js";
 import { serveAsset } from "./static.js";
 
 /**
@@ -54,6 +54,19 @@ const stageBranches = ((): string[] => {
     return [];
   }
 })();
+// Absent where the action file does not ship, or its `soak:` default does not parse: the
+// pipeline graphic then shows stages with no countdown rather than a crashed endpoint.
+const promoteChangeActionPath = join(repoRoot, ".github", "actions", "promote-change", "action.yml");
+const soakSeconds = ((): Record<string, number> | undefined => {
+  try {
+    const parsed = soakOf(promoteChangeActionPath);
+    if (parsed === undefined) console.warn("soak: default missing or unparsable; pipeline will show no timers");
+    return parsed;
+  } catch {
+    console.warn("soak: action file unreadable; pipeline will show no timers");
+    return undefined;
+  }
+})();
 
 const repo = parseRepo(process.env["LOOP_REPO"] ?? "PersonalCorpAcc/agentic-loop-canary");
 
@@ -75,7 +88,8 @@ const server = createServer(async (request, response) => {
     return;
   }
   if (request.url === "/api/stages") {
-    const stages = stageBranches.length < 2 ? [] : await listStages(stageBranches).catch(() => [] as Stage[]);
+    const stages =
+      stageBranches.length < 2 ? [] : await listStages(stageBranches, soakSeconds).catch(() => [] as Stage[]);
     response.writeHead(200, { "content-type": "application/json" });
     response.end(JSON.stringify(stages));
     return;
