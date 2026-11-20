@@ -1,5 +1,5 @@
 ---
-# Managed by @plainconceptsplatform/workflows@0.5.1. Source: loops/workflows/agent-implement.md. Profile digest: f67d7ff379d7. Update with `workflows update --force`; consumer edits may be overwritten.
+# Managed by @software-factory-dev/cli@0.5.1. Source: loops/workflows/agent-implement.md. Profile digest: 049269cfb7da. Update with `workflows update --force`; consumer edits may be overwritten.
 env:
   VERIFY_COMMANDS: "pnpm install --frozen-lockfile && pnpm run build && pnpm run test"
   REPO_RULES: "Install with the lockfile frozen; an install that resolves a different tree is not reproducing the change under review. Run scripts through pnpm rather than npx, or a second package manager's lockfile appears in the diff."
@@ -37,7 +37,7 @@ env:
   # How this repository's engine says it will not bill the request. An extended regular
   # expression, from the engine table, because the wording and the code belong to the
   # provider and this package runs five of them (FR-087).
-  REFUSAL_SIGNATURE: "billing_error|credit balance is too low"
+  REFUSAL_SIGNATURE: "billing_error|credit balance is too low|authentication_failed|invalid api key"
   INCOMPLETE_COMMENT: "Automated implementation ran and ended without an outcome. The issue is released and flagged for review: a run that got this far and still failed will fail the same way again."
   ISSUE_CONTEXT_PATH: /tmp/gh-aw/agent/implementation-context.json
   # The kit resolves a commit identity from `git config` first and from this second, and
@@ -579,6 +579,12 @@ runs-on-slim: ubuntu-24.04
 
 engine:
   id: claude
+  # The agent job's own concurrency group. The compiler's default is one group per workflow,
+  # so every implement agent in the repository queued behind the last whatever the router
+  # allowed; per issue, the router's implement lanes are the only limit (20/11/2026).
+  concurrency:
+    group: "gh-aw-implement-${{ inputs.issue-number }}"
+    cancel-in-progress: false
 model: claude-sonnet-5
 
 max-turns: 3000

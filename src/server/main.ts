@@ -5,6 +5,9 @@ import { WebSocketServer } from "ws";
 
 import type { LoopEvent, LoopRun, Stage } from "../shared/types.js";
 import { parseRepo } from "../shared/repo.js";
+import { buildFlow, parsePeriod } from "./flow.js";
+import { fetchRepoSnapshot, MetricsCache } from "./metrics.js";
+import { reposOf } from "./repos.js";
 import { listRuns } from "./runs.js";
 import { listStages } from "./stages.js";
 import { readBranchStrategy, readStageBranches } from "./strategy.js";
@@ -27,6 +30,8 @@ import { serveAsset } from "./static.js";
 // that builds, starts, reports healthy, and answers nothing.
 const port = Number(process.env["PORT"] ?? 8787);
 const pollSeconds = Number(process.env["POLL_SECONDS"] ?? 20);
+const metricsRefreshSeconds = Number(process.env["METRICS_REFRESH_SECONDS"] ?? 60);
+const metricsCache = new MetricsCache(reposOf(), fetchRepoSnapshot);
 const webRoot = process.env["WEB_ROOT"] ?? join(dirname(fileURLToPath(import.meta.url)), "..", "..", "dist");
 const repoRoot = join(dirname(fileURLToPath(import.meta.url)), "..", "..");
 // Absent where a deployment ships without .github, which is a config gap worth showing as
@@ -74,6 +79,27 @@ const server = createServer(async (request, response) => {
     response.end(JSON.stringify(stages));
     return;
   }
+  if (request.url?.startsWith("/api/metrics")) {
+    const repo = new URL(request.url, "http://localhost").searchParams.get("repo") ?? "";
+    const cached = metricsCache.get(repo);
+    response.writeHead(cached === undefined ? 404 : 200, { "content-type": "application/json" });
+    response.end(JSON.stringify(cached ?? { error: "not configured or not yet refreshed" }));
+    return;
+  }
+  if (request.url?.startsWith("/api/flow")) {
+    const params = new URL(request.url, "http://localhost").searchParams;
+    const repo = params.get("repo") ?? "";
+    const cached = metricsCache.get(repo);
+    if (cached?.snapshot === undefined) {
+      response.writeHead(404, { "content-type": "application/json" });
+      response.end(JSON.stringify({ error: "not configured or not yet refreshed" }));
+      return;
+    }
+    const flow = buildFlow(cached.snapshot, parsePeriod(params.get("period")));
+    response.writeHead(200, { "content-type": "application/json" });
+    response.end(JSON.stringify(flow));
+    return;
+  }
   if (request.url === "/api/health") {
     response.writeHead(200, { "content-type": "application/json" });
     response.end(JSON.stringify({ ok: true }));
@@ -114,4 +140,6 @@ server.listen(port, () => {
   console.log(`loopscope on http://localhost:${port}`);
   void poll();
   setInterval(() => void poll(), pollSeconds * 1000);
+  void metricsCache.refresh();
+  setInterval(() => void metricsCache.refresh(), metricsRefreshSeconds * 1000);
 });

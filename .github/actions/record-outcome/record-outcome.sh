@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Managed by @plainconceptsplatform/workflows@0.5.1. Source: loops/actions/record-outcome/record-outcome.sh. Profile digest: f67d7ff379d7. Update with `workflows update --force`; consumer edits may be overwritten.
+# Managed by @software-factory-dev/cli@0.5.1. Source: loops/actions/record-outcome/record-outcome.sh. Profile digest: 049269cfb7da. Update with `workflows update --force`; consumer edits may be overwritten.
 #
 # One line per job saying what happened and why (FR-058).
 #
@@ -53,11 +53,18 @@ readonly REASONS=(
   # A human is needed, or the machinery could not proceed.
   conflict-handed-off
   review-requested
+  # A reviewer asked for changes on the pull request; apply-review answers it, not the gate
+  # (T246). Missing from this list until 20/11/2026, so the gate's step failed on first use.
+  changes-requested
   # The implementing worker asked the kit for the whole change and the kit declined:
   # refused before it wrote anything, or failed its own gates after. Its reason token
   # is its own vocabulary and belongs in the detail sentence, not in this set -- what
   # this loop did is the same either way, which is hand the issue back.
   pipeline-declined
+  # The canary cycle's two ways to fail (FR-060): a hop that never happened within its bound,
+  # and a hop that happened wrongly.
+  timed-out
+  assertion-failed
   budget-exhausted
   egress-blocked
   runner-offline

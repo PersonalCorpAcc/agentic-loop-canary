@@ -1,5 +1,5 @@
 ---
-# Managed by @plainconceptsplatform/workflows@0.5.1. Source: loops/workflows/agent-apply-review.md. Profile digest: f67d7ff379d7. Update with `workflows update --force`; consumer edits may be overwritten.
+# Managed by @software-factory-dev/cli@0.5.1. Source: loops/workflows/agent-apply-review.md. Profile digest: 049269cfb7da. Update with `workflows update --force`; consumer edits may be overwritten.
 env:
   # Printed by the prompt as the verification block. Consumers set their own commands.
   VERIFY_COMMANDS: "pnpm install --frozen-lockfile && pnpm run build && pnpm run test"
@@ -106,8 +106,11 @@ jobs:
               }
             }' \
             -f owner="${REPO%/*}" -f name="${REPO#*/}" -F number="$PR" \
-            --jq -c '[.data.repository.pullRequest.reviewThreads.nodes[]
-                      | select(.isResolved == false and .isOutdated == false)]')
+            --jq '[.data.repository.pullRequest.reviewThreads.nodes[]
+                      | select(.isResolved == false and .isOutdated == false)]' | jq -c .)
+          # gh's jq option takes an expression only: given the compact flag first, gh read the flag as the filter and the
+          # filter as a second endpoint, and failed "accepts 1 arg(s), received 2" on the first
+          # review anyone requested (loopscope PR #158, 20/11/2026).
           unresolved=$(printf '%s' "$threads" | jq 'length')
 
           # Measured and then acted on. Two events arrive for one review -- the submission and

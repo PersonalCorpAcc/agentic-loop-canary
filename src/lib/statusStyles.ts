@@ -17,6 +17,8 @@
  * Replace `Kind` / `StateValue` / the three maps with your own entities.
  */
 
+import type { Outcome } from "../shared/types.js";
+
 export type Tone = "ok" | "warn" | "err" | "info" | "neutral";
 
 export interface StatusStyle {
@@ -43,11 +45,25 @@ export const STAGE_STYLES: Record<StageState, StatusStyle> = {
   frozen: { tone: "err", icon: "✕", label: "Frozen" },
 };
 
-export type Kind = "job" | "stage";
-export type StateValue = JobState | StageState;
+// ---- loop: a router run's own outcome ------------------------------------
+// Mirrors `Outcome` in `shared/types.ts` plus the "unknown" a run with no parseable outcome
+// line gets -- imported, not duplicated, so a fifth outcome there is a compile error here too.
+export type LoopOutcomeState = Outcome | "unknown";
+
+export const LOOP_STYLES: Record<LoopOutcomeState, StatusStyle> = {
+  acted: { tone: "ok", icon: "✓", label: "Acted" },
+  "no-action": { tone: "neutral", icon: "•", label: "No action" },
+  "handed-to-human": { tone: "warn", icon: "◐", label: "Handed to human" },
+  failed: { tone: "err", icon: "✕", label: "Failed" },
+  unknown: { tone: "info", icon: "?", label: "Unknown" },
+};
+
+export type Kind = "job" | "stage" | "loop";
+export type StateValue = JobState | StageState | LoopOutcomeState;
 
 export function styleFor(kind: "job", state: JobState): StatusStyle;
 export function styleFor(kind: "stage", state: StageState): StatusStyle;
+export function styleFor(kind: "loop", state: LoopOutcomeState): StatusStyle;
 export function styleFor(kind: Kind, state: StateValue): StatusStyle;
 export function styleFor(kind: Kind, state: StateValue): StatusStyle {
   switch (kind) {
@@ -55,5 +71,7 @@ export function styleFor(kind: Kind, state: StateValue): StatusStyle {
       return JOB_STYLES[state as JobState];
     case "stage":
       return STAGE_STYLES[state as StageState];
+    case "loop":
+      return LOOP_STYLES[state as LoopOutcomeState];
   }
 }
