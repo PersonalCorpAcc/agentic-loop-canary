@@ -191,6 +191,7 @@ export interface FlowItem {
   readonly stage: FlowStageName;
   readonly held: boolean;
   readonly history: readonly FlowStageEntry[];
+  readonly durationsMs: Record<FlowStageName, number>;
 }
 
 export interface CfdBucket {
@@ -201,6 +202,28 @@ export interface CfdBucket {
 export interface FlowResult {
   readonly items: readonly FlowItem[];
   readonly cfd: readonly CfdBucket[];
+  /** The resolved period window (#165), so a caller can filter "items in the period" (e.g.
+   *  shipped items for the time-in-stage bar) without re-deriving period math of its own. */
+  readonly from: string;
+  readonly to: string;
+}
+
+/** Milliseconds spent in each stage a replayed `history` actually passed through: the gap to
+ *  the next entry, or to `now` for the last one (#165). A stage `history` never entered (for
+ *  example `validating` / `awaiting-review`, which #161's replay cannot represent -- see
+ *  `replayFlowStageHistory`'s doc comment) gets an explicit `0` rather than being absent, so a
+ *  caller can always index the full `FlowStageName` set. A zero-length gap between two entries
+ *  (entered and left within the same poll) is likewise an explicit `0`, never dropped -- the
+ *  full record always sums to `now - history[0].enteredAt`. */
+export function stageDurations(history: readonly FlowStageEntry[], now: string): Record<FlowStageName, number> {
+  const durations = zeroCounts();
+  for (let i = 0; i < history.length; i += 1) {
+    const entry = history[i];
+    if (entry === undefined) continue;
+    const nextAt = history[i + 1]?.enteredAt ?? now;
+    durations[entry.stage] += new Date(nextAt).getTime() - new Date(entry.enteredAt).getTime();
+  }
+  return durations;
 }
 
 /** The `period` query string's shape, parsed locally until `src/shared/period.ts` lands in
@@ -230,7 +253,7 @@ function linkedPrOf(issue: ApiIssue, pullRequests: readonly ApiPullRequest[]): L
   return { labels: labelNames(pr.labels), state: pr.state === "open" ? "open" : "closed" };
 }
 
-function buildFlowItem(issue: ApiIssue, snapshot: RepoSnapshot): FlowItem {
+function buildFlowItem(issue: ApiIssue, snapshot: RepoSnapshot, now: Date): FlowItem {
   const labels = labelNames(issue.labels);
   const issueState = issue.state === "closed" ? "closed" : "open";
   const linkedPr = linkedPrOf(issue, snapshot.pullRequests);
@@ -239,7 +262,8 @@ function buildFlowItem(issue: ApiIssue, snapshot: RepoSnapshot): FlowItem {
     labels,
     createdAt: issue.created_at,
   });
-  return { issue: issue.number, title: issue.title, url: issue.html_url, stage, held, history };
+  const durationsMs = stageDurations(history, now.toISOString());
+  return { issue: issue.number, title: issue.title, url: issue.html_url, stage, held, history, durationsMs };
 }
 
 function zeroCounts(): Record<FlowStageName, number> {
@@ -286,9 +310,9 @@ function earliestCreatedAt(issues: readonly ApiIssue[]): Date | undefined {
 /** Classified items and day-bucketed CFD counts, built entirely from a cached snapshot --
  *  never a live forge read (#154's contract, which `/api/flow` keeps). */
 export function buildFlow(snapshot: RepoSnapshot, period: Period, now: Date = new Date()): FlowResult {
-  const items = snapshot.issues.map((issue) => buildFlowItem(issue, snapshot));
+  const items = snapshot.issues.map((issue) => buildFlowItem(issue, snapshot, now));
   const to = now;
   const from =
     "all" in period ? earliestCreatedAt(snapshot.issues) ?? to : new Date(to.getTime() - period.days * 86_400_000);
-  return { items, cfd: cfdBuckets(items, from, to) };
+  return { items, cfd: cfdBuckets(items, from, to), from: from.toISOString(), to: to.toISOString() };
 }
