@@ -50,7 +50,7 @@ Scope decisions, made so implementation does not re-litigate them:
 
 ## 1. `computeDeploymentFrequency` and its types
 
-- [ ] 1.1 Add `src/server/metrics/deploymentFrequency.ts`. Export:
+- [x] 1.1 Add `src/server/metrics/deploymentFrequency.ts`. Export:
       - `DeploymentFrequencyEntry { issue: number; title: string; url: string; mergedAt: string }`
       - `DeploymentFrequencyBucket { date: string; count: number }` (`date` is the UTC
         calendar day for daily buckets, or the UTC Monday-anchored week-start day for
@@ -75,7 +75,7 @@ Scope decisions, made so implementation does not re-litigate them:
           current-period only).
       - Only type-import `TimelineEvent` from `../metrics.js`, the same import `leadTime.ts`
         already uses — no new timeline type.
-- [ ] 1.2 Add `src/server/metrics/deploymentFrequency.test.ts`: fixtures of real
+- [x] 1.2 Add `src/server/metrics/deploymentFrequency.test.ts`: fixtures of real
       `TimelineEvent[]` shapes (the same hand-built style `leadTime.test.ts` and
       `flow.test.ts` already use — no network call), covering, each asserted against an
       exact expected value:
@@ -101,7 +101,7 @@ Scope decisions, made so implementation does not re-litigate them:
 
 ## 2. API endpoint
 
-- [ ] 2.1 In `src/server/main.ts`, add a `/api/deployment-frequency` route following the
+- [x] 2.1 In `src/server/main.ts`, add a `/api/deployment-frequency` route following the
       exact `/api/lead-time` pattern: parse `repo`/`period` query params, 404 with the
       same error body when `metricsCache.get(repo)?.snapshot` is undefined, else resolve
       `{ from, to }` via `periodWindow(parsePeriod(...), new Date())` and respond with
@@ -110,14 +110,14 @@ Scope decisions, made so implementation does not re-litigate them:
 
 ## 3. Wiring: Overview (stat tile + sparkline) and Delivery (trend chart + table)
 
-- [ ] 3.1 Add `src/web/deploymentFrequency.ts` (pure, browser-safe, type-only import from
+- [x] 3.1 Add `src/web/deploymentFrequency.ts` (pure, browser-safe, type-only import from
       `../server/metrics/deploymentFrequency.js`): a `formatDeploymentFrequencyDelta(total: number, previousTotal: number): string`
       helper — `"no prior data"` when `previousTotal === 0` and `total > 0`, `"no change"`
       when both are `0`, otherwise a signed count-vs-previous string (e.g. `"+3 vs previous period"`,
       `"-2 vs previous period"`), never a percentage (there is no clean percentage when
       `previousTotal` can be `0` — this sidesteps the divide-by-zero edge case entirely
       rather than special-casing it downstream).
-- [ ] 3.2 Wire `src/web/pages/Overview.tsx`: alongside the existing lead-time `Section`,
+- [x] 3.2 Wire `src/web/pages/Overview.tsx`: alongside the existing lead-time `Section`,
       fetch `/api/deployment-frequency?repo=&period=` (same two-effect pattern already
       used for `/api/lead-time`) and add a "Deployment frequency" `Section` containing a
       `StatTile` (`label="Deployment frequency"`, `value={String(result.total)}`,
@@ -126,7 +126,7 @@ Scope decisions, made so implementation does not re-litigate them:
       `StatTile`'s actual prop names in `src/components/primitives/StatTile.tsx` before
       wiring — use whatever slot it already exposes for a delta/description line rather
       than inventing a new prop.
-- [ ] 3.3 Wire `src/web/pages/Delivery.tsx`: alongside the existing "Lead time" `Section`,
+- [x] 3.3 Wire `src/web/pages/Delivery.tsx`: alongside the existing "Lead time" `Section`,
       fetch `/api/deployment-frequency` the same way (reuse the `repo`/`period` state
       already in this component) and add a "Deployment frequency" `Section` containing,
       when `result.total > 0`, a `TrendChart` of `buckets` (`points={result.buckets.map(b => ({date: b.date, value: b.count}))}`)
@@ -134,11 +134,11 @@ Scope decisions, made so implementation does not re-litigate them:
       the same plain-anchor convention the Lead time table already uses, title, merged
       date), and when `result.total === 0` an explicit `HelperText`/empty-state message
       ("No changes merged in this period") instead of the chart.
-- [ ] 3.4 Add `src/web/deploymentFrequency.test.ts` for `formatDeploymentFrequencyDelta`
+- [x] 3.4 Add `src/web/deploymentFrequency.test.ts` for `formatDeploymentFrequencyDelta`
       (zero-previous, zero-both, positive delta, negative delta).
 
 ## 4. Verification
 
-- [ ] 4.1 `pnpm run typecheck && pnpm run test && pnpm run build` passes with no new
+- [x] 4.1 `pnpm run typecheck && pnpm run test && pnpm run build` passes with no new
       lint/type errors, and no new colour literal or direct `palette.status` access was
       introduced (Rule 2/3).
