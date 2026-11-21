@@ -2,15 +2,18 @@ import { useEffect, useState, type ReactElement } from "react";
 
 import { PageHeader, Section } from "@/components/layout";
 import { Sparkline } from "@/components/data-display";
+import { NeedsAPersonList } from "@/components/domain";
 import { HelperText, StatTile } from "@/components/primitives";
 
+import type { ChangesBoard } from "../../server/changes.js";
 import type { DeploymentFrequencyResult } from "../../server/metrics/deploymentFrequency.js";
 import type { LeadTimeResult } from "../../server/metrics/leadTime.js";
 import type { RepoRef } from "../../shared/repo.js";
 import { formatDeploymentFrequencyDelta } from "../deploymentFrequency.js";
 import { formatLeadTimeDays } from "../leadTime.js";
 
-/** Root page (`/`). Lead-time (#144) and deployment-frequency (#143) stat tiles -- #139's
+/** Root page (`/`). Lead-time (#144), deployment-frequency (#143) stat tiles, and the
+ *  needs-a-person list of stuck changes (#141, shared with the `/changes` board) -- #139's
  *  remaining children will add more summary tiles alongside them. */
 export function Overview(): ReactElement {
   const [repo, setRepo] = useState<RepoRef | null | undefined>(undefined);
@@ -18,6 +21,7 @@ export function Overview(): ReactElement {
   const [deploymentFrequency, setDeploymentFrequency] = useState<DeploymentFrequencyResult | null | undefined>(
     undefined,
   );
+  const [changes, setChanges] = useState<ChangesBoard | null | undefined>(undefined);
 
   useEffect(() => {
     fetch("/api/repo")
@@ -44,9 +48,23 @@ export function Overview(): ReactElement {
       .catch(() => setDeploymentFrequency(null));
   }, [repo]);
 
+  useEffect(() => {
+    if (repo === undefined || repo === null) return;
+    const params = new URLSearchParams({ repo: `${repo.owner}/${repo.name}` });
+    fetch(`/api/changes?${params.toString()}`)
+      .then((response) => (response.ok ? (response.json() as Promise<ChangesBoard>) : null))
+      .then(setChanges)
+      .catch(() => setChanges(null));
+  }, [repo]);
+
   return (
     <>
       <PageHeader title="Overview" />
+      {changes ? (
+        <Section title="Needs a person">
+          <NeedsAPersonList cards={changes.stuck} />
+        </Section>
+      ) : null}
       {leadTime ? (
         <Section title="Lead time">
           <StatTile

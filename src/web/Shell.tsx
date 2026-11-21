@@ -21,6 +21,7 @@ interface NavEntry {
 const NAV_ENTRIES: readonly NavEntry[] = [
   { label: "Overview", path: "/" },
   { label: "Delivery", path: "/delivery" },
+  { label: "Changes", path: "/changes" },
   { label: "Log", path: "/log" },
 ];
 
