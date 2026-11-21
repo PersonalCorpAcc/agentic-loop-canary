@@ -23,13 +23,13 @@ Scope decisions:
   existing top bar in `src/web/Shell.tsx` — no websocket event added, matching how `/api/repo`
   is already a plain poll-once-on-mount fetch there.
 
-- [ ] 1. `src/server/github-app.ts`: `signAppJwt(appId, privateKeyPem, now)` (RS256 JWT,
+- [x] 1. `src/server/github-app.ts`: `signAppJwt(appId, privateKeyPem, now)` (RS256 JWT,
       `iss`/`iat`/`exp`), `appCredentialsOf(env)` (reads `GH_APP_ID` /
       `GH_APP_PRIVATE_KEY`, unescapes literal `\n`), and `installationTokenFor(repo,
       credentials, fetchImpl, now)` — looks up the repo's installation id, exchanges the
       JWT for an installation access token, and caches it per owner until shortly before
       `expires_at`.
-- [ ] 2. `src/server/forge.ts`: `ForgeClient` with `fetchJson<T>(url, repo)` and
+- [x] 2. `src/server/forge.ts`: `ForgeClient` with `fetchJson<T>(url, repo)` and
       `fetchText(url, repo)`. Resolves a token via an injected `tokenFor(repo)` (GitHub
       App first, `GH_TOKEN`/`GITHUB_TOKEN` fallback, logged once), tracks
       `X-RateLimit-Remaining`/`X-RateLimit-Limit`/`X-RateLimit-Reset` from every response,
@@ -39,19 +39,19 @@ Scope decisions:
       body or headers say rate-limited sets the pause instead of retrying. Export a
       default `forge` instance wired to real `fetch`/`Date.now`/`console` and
       `installationTokenFor`, plus `forge.status()` for the `/api/rate-limit` endpoint.
-- [ ] 3. Refactor `src/server/runs.ts`, `src/server/stages.ts` and `src/server/metrics.ts`
+- [x] 3. Refactor `src/server/runs.ts`, `src/server/stages.ts` and `src/server/metrics.ts`
       to route every GitHub request through the shared `forge` client instead of their own
       `fetch` + bearer-token header code. Keep every exported pure function's behaviour
       (`routeOf`, `subjectOf`, `carriedIssuesOf`, `blockingLabelOf`,
       `remainingSoakSeconds`, etc.) unchanged.
-- [ ] 4. `src/server/metrics.ts`: cache a completed run's outcome line (including a
+- [x] 4. `src/server/metrics.ts`: cache a completed run's outcome line (including a
       lookup that found nothing) so `runsWithOutcome` never re-fetches its job log on a
       later refresh; a run that has not finished yet is always re-fetched.
-- [ ] 5. `src/server/main.ts`: default `POLL_SECONDS` to `300`; add `GET /api/rate-limit`
+- [x] 5. `src/server/main.ts`: default `POLL_SECONDS` to `300`; add `GET /api/rate-limit`
       returning `forge.status()`.
-- [ ] 6. `src/web/Shell.tsx`: a quiet "data paused until HH:MM" banner in the top bar,
+- [x] 6. `src/web/Shell.tsx`: a quiet "data paused until HH:MM" banner in the top bar,
       polling `/api/rate-limit` and rendering only while paused.
-- [ ] 7. Tests: `src/server/github-app.test.ts` (JWT signing + verification with a
+- [x] 7. Tests: `src/server/github-app.test.ts` (JWT signing + verification with a
       generated RSA key pair, installation-token exchange and its caching),
       `src/server/forge.test.ts` (403/429 back-off stops further requests until reset,
       ETag reuse on a `304`, the 10%-remaining pause), and a `src/server/metrics.test.ts`
