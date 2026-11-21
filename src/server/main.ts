@@ -9,6 +9,7 @@ import { buildFlow, parsePeriod, periodWindow } from "./flow.js";
 import { fetchRepoSnapshot, MetricsCache } from "./metrics.js";
 import { computeDeploymentFrequency } from "./metrics/deploymentFrequency.js";
 import { computeLeadTime } from "./metrics/leadTime.js";
+import { forge } from "./forge.js";
 import { reposOf } from "./repos.js";
 import { listRuns } from "./runs.js";
 import { listStages } from "./stages.js";
@@ -31,7 +32,7 @@ import { serveAsset } from "./static.js";
 // local default. Binding a fixed port on a host that routes to a different one is a service
 // that builds, starts, reports healthy, and answers nothing.
 const port = Number(process.env["PORT"] ?? 8787);
-const pollSeconds = Number(process.env["POLL_SECONDS"] ?? 20);
+const pollSeconds = Number(process.env["POLL_SECONDS"] ?? 300);
 const metricsRefreshSeconds = Number(process.env["METRICS_REFRESH_SECONDS"] ?? 60);
 const metricsCache = new MetricsCache(reposOf(), fetchRepoSnapshot);
 const webRoot = process.env["WEB_ROOT"] ?? join(dirname(fileURLToPath(import.meta.url)), "..", "..", "dist");
@@ -144,6 +145,11 @@ const server = createServer(async (request, response) => {
     const deploymentFrequency = computeDeploymentFrequency(cached.snapshot.issues, cached.snapshot.issueTimelines, from, to);
     response.writeHead(200, { "content-type": "application/json" });
     response.end(JSON.stringify(deploymentFrequency));
+    return;
+  }
+  if (request.url === "/api/rate-limit") {
+    response.writeHead(200, { "content-type": "application/json" });
+    response.end(JSON.stringify(forge.status()));
     return;
   }
   if (request.url === "/api/health") {
