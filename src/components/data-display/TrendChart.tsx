@@ -13,6 +13,11 @@ import { HelperText } from "@/components/primitives";
 
 export interface TrendChartProps {
   readonly points: readonly { date: string; value: number }[];
+  /** The previous period's series, drawn dashed at the same x positions as `points`
+   *  (index-aligned, not date-aligned, since the two periods cover different calendar
+   *  dates) and scaled against the same y-domain. Ignored when its length differs from
+   *  `points`. Purely contextual: no markers, no tooltip. */
+  readonly previousPoints?: readonly { date: string; value: number }[];
   readonly height?: number;
   /** Formats a value for the point tooltip. Defaults to `String`. */
   readonly valueLabel?: (value: number) => string;
@@ -38,6 +43,7 @@ function pickTickIndices(n: number, count: number): readonly number[] {
 
 export function TrendChart({
   points,
+  previousPoints,
   height = 160,
   valueLabel = String,
 }: TrendChartProps): JSX.Element {
@@ -47,10 +53,14 @@ export function TrendChart({
     return <HelperText>not enough data yet</HelperText>;
   }
 
+  const comparablePreviousPoints =
+    previousPoints !== undefined && previousPoints.length === points.length ? previousPoints : undefined;
+
   const plotHeight = height - AXIS_HEIGHT;
   const values = points.map((p) => p.value);
-  const min = Math.min(...values);
-  const max = Math.max(...values);
+  const previousValues = comparablePreviousPoints?.map((p) => p.value) ?? [];
+  const min = Math.min(...values, ...previousValues);
+  const max = Math.max(...values, ...previousValues);
   const valueRange = max - min;
   const padding = (valueRange || 1) * Y_PADDING_RATIO;
   const top = max + padding;
@@ -62,6 +72,7 @@ export function TrendChart({
     plotHeight - ((value - bottom) / span) * plotHeight;
 
   const coords = points.map((p, i) => `${xAt(i)},${yAt(p.value)}`).join(" ");
+  const previousCoords = comparablePreviousPoints?.map((p, i) => `${xAt(i)},${yAt(p.value)}`).join(" ");
   const tickIndices = pickTickIndices(points.length, MAX_TICKS);
 
   return (
@@ -81,6 +92,17 @@ export function TrendChart({
         stroke={theme.palette.divider}
         strokeWidth={1}
       />
+      {previousCoords !== undefined && (
+        <polyline
+          points={previousCoords}
+          fill="none"
+          stroke={theme.palette.text.secondary}
+          strokeWidth={2}
+          strokeDasharray="4 3"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        />
+      )}
       <polyline
         points={coords}
         fill="none"
