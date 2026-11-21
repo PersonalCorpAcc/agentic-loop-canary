@@ -45,3 +45,17 @@ describe("the dark palette the shell uses (#142)", () => {
     expect(meetsAA(brand!.contrastText!, brand!.main!)).toBe(true);
   });
 });
+
+describe("the chart categorical ramp the trend panels use (#149)", () => {
+  it("every categorical colour clears non-text (3:1) contrast against the page background", () => {
+    const { chart, background } = darkPalette;
+    for (const colour of chart!.categorical!) {
+      expect(meetsAA(colour, background!.default!, "large")).toBe(true);
+    }
+  });
+
+  it("the overflow colour also clears non-text contrast against the page background", () => {
+    const { chart, background } = darkPalette;
+    expect(meetsAA(chart!.other!, background!.default!, "large")).toBe(true);
+  });
+});

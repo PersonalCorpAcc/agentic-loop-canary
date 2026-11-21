@@ -67,6 +67,24 @@ const status = {
   // stopped being read (the mark rendered with `err`).
 };
 
+/**
+ * Multi-series chart colour (#149's trend panels -- the first call site that needs more than
+ * one line on a chart at once). Neither `brand` nor `status` are usable here: `brand` is a
+ * single ink, and `status` is reserved for domain state, read only through `useStatusTone`
+ * (Rule 3) -- a route name is not a status. A genuinely new design decision, so it is a
+ * semantic slot rather than a literal at the call site (Rule 2 / the component checklist's
+ * item 5).
+ *
+ * The ramp is Okabe & Ito's colour-blind-safe 8-colour set (2008), minus black/white, chosen
+ * so adjacent series stay distinguishable under the common forms of colour vision deficiency.
+ * `other` is the overflow colour once every ramp colour is in use, applied in `trendChart.ts`
+ * rather than hard-coded in a call site.
+ */
+const chart = {
+  categorical: ["#e69f00", "#56b4e9", "#009e73", "#f0e442", "#0072b2", "#d55e00", "#cc79a7"],
+  other: "#64748b",
+};
+
 export const palette: PaletteOptions = {
   mode: "light",
   primary: brand,
@@ -82,6 +100,7 @@ export const palette: PaletteOptions = {
     raised: "#ffffff",
     muted: "#f8fafc",
   },
+  chart,
   background: {
     default: paper.main,
     paper: "#ffffff",
@@ -151,6 +170,7 @@ export const darkPalette: PaletteOptions = {
     raised: "#111b2e",
     muted: "#17233a",
   },
+  chart,
   background: {
     default: "#0b1220",
     paper: "#111b2e",

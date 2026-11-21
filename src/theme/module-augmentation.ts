@@ -68,6 +68,11 @@ declare module "@mui/material/styles" {
     muted: string;
   }
 
+  interface ChartColor {
+    categorical: readonly string[];
+    other: string;
+  }
+
   interface Palette {
     brand: BrandColor;
     paper: PaperColor;
@@ -75,6 +80,7 @@ declare module "@mui/material/styles" {
     status: StatusColor;
     border: BorderColor;
     surface: SurfaceColor;
+    chart: ChartColor;
   }
 
   interface PaletteOptions {
@@ -84,6 +90,7 @@ declare module "@mui/material/styles" {
     status?: Partial<StatusColor>;
     border?: Partial<BorderColor>;
     surface?: Partial<SurfaceColor>;
+    chart?: Partial<ChartColor>;
   }
 
   interface TypographyVariants {
