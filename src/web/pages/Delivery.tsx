@@ -3,16 +3,18 @@ import { useSearchParams } from "react-router-dom";
 import Stack from "@mui/material/Stack";
 
 import { PageHeader, Section } from "@/components/layout";
-import { TimeInStageBar, WaitingOnPersonList } from "@/components/domain";
+import { LeadTimeChart, ThroughputChart, TimeInStageBar, WaitingOnPersonList } from "@/components/domain";
 import { TrendChart } from "@/components/data-display";
 import { DataTable } from "@/components/data-display/DataTable";
-import { HelperText } from "@/components/primitives";
+import { ChartSkeleton, HelperText } from "@/components/primitives";
 
 import type { FlowResult } from "../../server/flow.js";
 import type { DeploymentFrequencyEntry, DeploymentFrequencyResult } from "../../server/metrics/deploymentFrequency.js";
 import type { LeadTimeEntry, LeadTimeResult } from "../../server/metrics/leadTime.js";
+import { parsePeriod, previousPeriodWindow } from "../../shared/period.js";
 import type { RepoRef } from "../../shared/repo.js";
-import { formatLeadTimeDays } from "../leadTime.js";
+import { formatLeadTimeDays, leadTimeStats } from "../leadTime.js";
+import { throughputByDay } from "../throughput.js";
 import { shippedInPeriod, timeInStageRows } from "../timeInStageBar.js";
 import { waitingRows } from "../waitingOnPerson.js";
 
@@ -79,6 +81,51 @@ export function Delivery(): ReactElement {
           <Section title="Waiting on a person">
             <WaitingOnPersonList rows={waitingRows(flow.items, new Date(flow.to))} />
           </Section>
+          {(() => {
+            const shipped = shippedInPeriod(flow.items, flow.from, flow.to);
+            if (shipped.length === 0) {
+              return (
+                <>
+                  <Section title="Throughput">
+                    <ChartSkeleton />
+                  </Section>
+                  <Section title="Lead time trend (created → shipped)">
+                    <ChartSkeleton />
+                  </Section>
+                </>
+              );
+            }
+
+            const period = parsePeriod(searchParams.get("period"));
+            const previousWindow = previousPeriodWindow(period, new Date(flow.to));
+            const currentThroughput = throughputByDay(flow.items, new Date(flow.from), new Date(flow.to));
+            const previousThroughput = throughputByDay(
+              flow.items,
+              new Date(previousWindow.from),
+              new Date(previousWindow.to),
+            );
+            const currentLeadTime = leadTimeStats(flow.items, flow.from, flow.to);
+            const previousLeadTime = leadTimeStats(flow.items, previousWindow.from, previousWindow.to);
+
+            return (
+              <>
+                <Section title="Throughput">
+                  <ThroughputChart current={currentThroughput} previous={previousThroughput} />
+                </Section>
+                <Section title="Lead time trend (created → shipped)">
+                  <Stack spacing={1}>
+                    <LeadTimeChart current={currentLeadTime} previous={previousLeadTime} />
+                    {currentLeadTime.excludedCount > 0 ? (
+                      <HelperText>
+                        {currentLeadTime.excludedCount} shipped item{currentLeadTime.excludedCount === 1 ? "" : "s"}{" "}
+                        excluded for unreliable creation lineage
+                      </HelperText>
+                    ) : null}
+                  </Stack>
+                </Section>
+              </>
+            );
+          })()}
           {leadTime ? (
             <Section title="Lead time">
               <Stack spacing={2}>

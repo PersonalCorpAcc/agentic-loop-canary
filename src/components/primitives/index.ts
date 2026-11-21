@@ -22,6 +22,7 @@ export { CopyButton, type CopyButtonProps } from "./CopyButton";
 // useStatusTone, so it is a sanctioned palette.status consumer like the rest.
 export { ErrorMarker, type ErrorMarkerProps } from "./ErrorMarker";
 export { HelperText, type HelperTextProps } from "./HelperText";
+export { ChartSkeleton, type ChartSkeletonProps } from "./ChartSkeleton";
 export {
   RailNode,
   type RailNodeProps,
