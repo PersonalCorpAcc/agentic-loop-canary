@@ -1,6 +1,7 @@
 import { blockingLabelOf } from "./stages.js";
 import type { RepoSnapshot, ApiIssue, ApiPullRequest, TimelineEvent } from "./metrics.js";
 import { carriedIssuesOf } from "./runs.js";
+import type { LoopRun } from "../shared/types.js";
 
 /**
  * The Flow page's one deterministic classifier: labels in, exactly one factory stage out --
@@ -40,6 +41,7 @@ export const FLOW_STAGES: readonly FlowStageName[] = [
 export interface LinkedPr {
   readonly labels: readonly string[];
   readonly state: "open" | "closed";
+  readonly url: string;
   readonly reviewDecision?: string | null;
 }
 
@@ -192,6 +194,16 @@ export interface FlowItem {
   readonly held: boolean;
   readonly history: readonly FlowStageEntry[];
   readonly durationsMs: Record<FlowStageName, number>;
+  /** The issue's own labels -- the work item table's `estimateOf` (#162) parses `sp-N` off
+   *  these rather than re-fetching or re-deriving them. */
+  readonly labels: readonly string[];
+  /** The linked pull request's own URL, where one exists -- the work item table's "PR link"
+   *  column (#162). `linkedPrOf` already resolves which pull request that is. */
+  readonly prUrl?: string;
+  /** The most recent run naming this issue, by `subject` (`#N`) or `carriedIssues` -- the
+   *  work item table's "last run outcome" column (#162), reusing `describe()` / `styleFor`
+   *  the same way `loopTable.ts` already does for the Loop page. */
+  readonly lastRun?: LoopRun;
 }
 
 export interface CfdBucket {
@@ -250,7 +262,20 @@ function linkedPrOf(issue: ApiIssue, pullRequests: readonly ApiPullRequest[]): L
   const candidates = pullRequests.filter((pr) => carriedIssuesOf(pr.body ?? "").includes(issue.number));
   const pr = candidates.find((candidate) => candidate.state === "open") ?? candidates[0];
   if (pr === undefined) return undefined;
-  return { labels: labelNames(pr.labels), state: pr.state === "open" ? "open" : "closed" };
+  return {
+    labels: labelNames(pr.labels),
+    state: pr.state === "open" ? "open" : "closed",
+    url: pr.html_url,
+  };
+}
+
+/** The most recent run naming `issue`, newest `startedAt` first -- the same `#N` / promotion
+ *  `carriedIssues` match `pullRequestNumberOf` and `subjectTextOf` already read a run's
+ *  subject with (`runs.ts` / `loopTable.ts`). */
+function lastRunOf(issue: number, runs: readonly LoopRun[]): LoopRun | undefined {
+  return runs
+    .filter((run) => run.subject === `#${issue}` || run.carriedIssues?.includes(issue) === true)
+    .sort((a, b) => b.startedAt.localeCompare(a.startedAt))[0];
 }
 
 function buildFlowItem(issue: ApiIssue, snapshot: RepoSnapshot, now: Date): FlowItem {
@@ -263,7 +288,19 @@ function buildFlowItem(issue: ApiIssue, snapshot: RepoSnapshot, now: Date): Flow
     createdAt: issue.created_at,
   });
   const durationsMs = stageDurations(history, now.toISOString());
-  return { issue: issue.number, title: issue.title, url: issue.html_url, stage, held, history, durationsMs };
+  const lastRun = lastRunOf(issue.number, snapshot.runs);
+  return {
+    issue: issue.number,
+    title: issue.title,
+    url: issue.html_url,
+    stage,
+    held,
+    history,
+    durationsMs,
+    labels,
+    ...(linkedPr !== undefined ? { prUrl: linkedPr.url } : {}),
+    ...(lastRun !== undefined ? { lastRun } : {}),
+  };
 }
 
 function zeroCounts(): Record<FlowStageName, number> {

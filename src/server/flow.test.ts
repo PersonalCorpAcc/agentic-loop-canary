@@ -10,6 +10,7 @@ import {
   stageDurations,
 } from "./flow.js";
 import type { ApiIssue, ApiPullRequest, RepoSnapshot, TimelineEvent } from "./metrics.js";
+import type { LoopRun } from "../shared/types.js";
 
 describe("classifying a flow stage off an issue's own labels", () => {
   // #162/#163/#165/#166, this repository's own in-flight sub-issues of #159 while this
@@ -50,21 +51,28 @@ describe("classifying a flow stage off an issue's own labels", () => {
   });
 
   it("is awaiting-review for an open linked PR carrying review, or missing a required approval", () => {
-    expect(classifyFlowStage(["implement"], { labels: ["review"], state: "open" }).stage).toBe("awaiting-review");
+    expect(classifyFlowStage(["implement"], { labels: ["review"], state: "open", url: "" }).stage).toBe(
+      "awaiting-review",
+    );
     expect(
-      classifyFlowStage(["implement"], { labels: [], state: "open", reviewDecision: "REVIEW_REQUIRED" }).stage,
+      classifyFlowStage(["implement"], { labels: [], state: "open", url: "", reviewDecision: "REVIEW_REQUIRED" })
+        .stage,
     ).toBe("awaiting-review");
   });
 
   it("is validating for an open linked PR carrying pr-pending or merge-gate", () => {
-    expect(classifyFlowStage(["implement"], { labels: ["pr-pending"], state: "open" }).stage).toBe("validating");
-    expect(classifyFlowStage(["implement"], { labels: ["merge-gate"], state: "open" }).stage).toBe("validating");
+    expect(classifyFlowStage(["implement"], { labels: ["pr-pending"], state: "open", url: "" }).stage).toBe(
+      "validating",
+    );
+    expect(classifyFlowStage(["implement"], { labels: ["merge-gate"], state: "open", url: "" }).stage).toBe(
+      "validating",
+    );
   });
 
   it("a closed linked PR never satisfies validating or awaiting-review", () => {
-    expect(classifyFlowStage(["refined", "implement"], { labels: ["pr-pending"], state: "closed" }).stage).toBe(
-      "ready",
-    );
+    expect(
+      classifyFlowStage(["refined", "implement"], { labels: ["pr-pending"], state: "closed", url: "" }).stage,
+    ).toBe("ready");
   });
 });
 
@@ -222,8 +230,24 @@ function pullRequest(partial: Partial<ApiPullRequest> & Pick<ApiPullRequest, "nu
   };
 }
 
-function snapshotOf(issues: ApiIssue[], pullRequests: ApiPullRequest[] = []): RepoSnapshot {
-  return { repo: "a/one", issues, pullRequests, labels: [], runs: [], issueTimelines: {} };
+function snapshotOf(
+  issues: ApiIssue[],
+  pullRequests: ApiPullRequest[] = [],
+  runs: LoopRun[] = [],
+): RepoSnapshot {
+  return { repo: "a/one", issues, pullRequests, labels: [], runs, issueTimelines: {} };
+}
+
+function run(partial: Partial<LoopRun> & Pick<LoopRun, "id">): LoopRun {
+  return {
+    route: "implement",
+    outcome: "acted",
+    reason: "",
+    subject: "-",
+    startedAt: "2026-01-01T00:00:00Z",
+    url: `https://github.com/a/one/actions/runs/${partial.id}`,
+    ...partial,
+  };
 }
 
 describe("building a flow result off a cached snapshot", () => {
@@ -265,5 +289,45 @@ describe("building a flow result off a cached snapshot", () => {
 
     const total = Object.values(result.items[0]?.durationsMs ?? {}).reduce((sum, ms) => sum + ms, 0);
     expect(total).toBe(now.getTime() - new Date("2026-01-01T00:00:00Z").getTime());
+  });
+
+  it("carries the issue's own labels and the linked PR's URL", () => {
+    const snapshot = snapshotOf(
+      [issue({ number: 161, labels: ["implement", "sp-3"] })],
+      [pullRequest({ number: 200, body: "<!-- implement-issue: 161 -->", html_url: "https://github.com/a/one/pull/200" })],
+    );
+
+    const result = buildFlow(snapshot, { days: 30 }, new Date("2026-01-10T00:00:00Z"));
+
+    expect(result.items[0]?.labels).toEqual(["implement", "sp-3"]);
+    expect(result.items[0]?.prUrl).toBe("https://github.com/a/one/pull/200");
+  });
+
+  it("has no prUrl when the issue has no linked PR", () => {
+    const snapshot = snapshotOf([issue({ number: 1 })]);
+    const result = buildFlow(snapshot, { days: 30 }, new Date("2026-01-10T00:00:00Z"));
+    expect(result.items[0]?.prUrl).toBeUndefined();
+  });
+
+  it("attaches the most recent run naming the issue, by subject or carriedIssues", () => {
+    const snapshot = snapshotOf(
+      [issue({ number: 1 })],
+      [],
+      [
+        run({ id: 1, subject: "#1", startedAt: "2026-01-01T00:00:00Z" }),
+        run({ id: 2, subject: "#1", startedAt: "2026-01-03T00:00:00Z" }),
+        run({ id: 3, carriedIssues: [1], startedAt: "2026-01-02T00:00:00Z" }),
+      ],
+    );
+
+    const result = buildFlow(snapshot, { days: 30 }, new Date("2026-01-10T00:00:00Z"));
+
+    expect(result.items[0]?.lastRun?.id).toBe(2);
+  });
+
+  it("has no lastRun when no run names the issue", () => {
+    const snapshot = snapshotOf([issue({ number: 1 })], [], [run({ id: 1, subject: "#2" })]);
+    const result = buildFlow(snapshot, { days: 30 }, new Date("2026-01-10T00:00:00Z"));
+    expect(result.items[0]?.lastRun).toBeUndefined();
   });
 });

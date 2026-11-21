@@ -26,8 +26,23 @@ const NAV_ENTRIES: readonly NavEntry[] = [
 
 /** The dashboard shell (#142): a dark nav rail on the left, a top bar (watched repository +
  *  period selector) above the routed page, built once so every child route — Overview,
- *  Delivery, the retired log view at `/loop` — shares the same chrome. */
+ *  Delivery, the retired log view at `/loop` — shares the same chrome.
+ *
+ *  `?tv=1` (#162) drops the nav rail and top bar so the routed page fills the viewport for a
+ *  wall display, the same URL-as-state convention `?period=` already uses. Polling inside the
+ *  routed page is untouched either way -- this only ever changes what wraps `<Outlet/>`. */
 export function Shell(): ReactElement {
+  const [searchParams] = useSearchParams();
+  const tv = searchParams.get("tv") === "1";
+
+  if (tv) {
+    return (
+      <Box sx={{ height: "100vh", minHeight: 0, overflow: "auto", p: 4 }}>
+        <Outlet />
+      </Box>
+    );
+  }
+
   return (
     <Stack direction="row" sx={{ height: "100vh", minHeight: 0 }}>
       <Box sx={{ width: NAV_RAIL_WIDTH, flexShrink: 0, p: 1 }}>
