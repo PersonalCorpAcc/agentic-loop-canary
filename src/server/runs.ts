@@ -1,12 +1,12 @@
 import type { LoopRun } from "../shared/types.js";
+import { forge } from "./forge.js";
 import { reposOf } from "./repos.js";
 
 /**
  * The loop's runs, from the forge.
  *
- * Read-only and unauthenticated where the repository is public, which is what the canary is.
- * A token is used when one is present, because the rate limit without one is 60 requests an
- * hour and this polls.
+ * Read-only, through the shared `forge` client (#207): authenticated as a GitHub App where
+ * one is configured, a personal token otherwise, rate-limit aware either way.
  *
  * What it cannot do yet: read each run's outcome line. That lives in the job log, which is a
  * second request per run and a zip to unpack, so the first version shows what the run list
@@ -14,7 +14,6 @@ import { reposOf } from "./repos.js";
  */
 
 const defaultRepo = reposOf()[0]!;
-const token = process.env["GH_TOKEN"] ?? process.env["GITHUB_TOKEN"] ?? "";
 
 interface ApiRun {
   readonly id: number;
@@ -70,29 +69,19 @@ export function carriedIssuesOf(body: string): number[] {
 }
 
 async function fetchPullRequestBody(repo: string, number: number): Promise<string | undefined> {
-  const response = await fetch(`https://api.github.com/repos/${repo}/pulls/${number}`, {
-    headers: {
-      accept: "application/vnd.github+json",
-      "x-github-api-version": "2022-11-28",
-      ...(token === "" ? {} : { authorization: `Bearer ${token}` }),
-    },
-  });
-  if (!response.ok) return undefined;
-  const body = await response.json() as { body?: string | null };
-  return body.body ?? "";
+  const body = await forge.fetchJson<{ body?: string | null }>(
+    `https://api.github.com/repos/${repo}/pulls/${number}`,
+    repo,
+  );
+  return body === undefined ? undefined : body.body ?? "";
 }
 
 export async function listRuns(limit = 50, repo = defaultRepo): Promise<LoopRun[]> {
-  const response = await fetch(`https://api.github.com/repos/${repo}/actions/runs?per_page=${limit}`, {
-    headers: {
-      accept: "application/vnd.github+json",
-      "x-github-api-version": "2022-11-28",
-      ...(token === "" ? {} : { authorization: `Bearer ${token}` }),
-    },
-  });
-  if (!response.ok) throw new Error(`the forge answered ${response.status}`);
-
-  const body = await response.json() as { workflow_runs?: ApiRun[] };
+  const body = await forge.fetchJson<{ workflow_runs?: ApiRun[] }>(
+    `https://api.github.com/repos/${repo}/actions/runs?per_page=${limit}`,
+    repo,
+  );
+  if (body === undefined) throw new Error(`the forge did not answer for ${repo}'s runs`);
   const runs = (body.workflow_runs ?? []).map((run): LoopRun => ({
     id: run.id,
     route: routeOf(run),

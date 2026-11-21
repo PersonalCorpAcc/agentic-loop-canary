@@ -8,6 +8,7 @@ import { Shell } from "./Shell.js";
 import { Overview } from "./pages/Overview.js";
 import { Delivery } from "./pages/Delivery.js";
 import { Loop } from "./pages/Loop.js";
+import { Changes } from "./pages/Changes.js";
 import { Log } from "./pages/Log.js";
 import { darkTheme } from "../theme/index.js";
 
@@ -23,6 +24,7 @@ createRoot(root).render(
             <Route path="/" element={<Overview />} />
             <Route path="/delivery" element={<Delivery />} />
             <Route path="/loop" element={<Loop />} />
+            <Route path="/changes" element={<Changes />} />
             <Route path="/log" element={<Log />} />
           </Route>
         </Routes>

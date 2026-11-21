@@ -5,10 +5,13 @@ import { WebSocketServer } from "ws";
 
 import type { LoopEvent, LoopRun, Stage } from "../shared/types.js";
 import { parseRepo } from "../shared/repo.js";
+import { buildChanges, changeThresholdsOf } from "./changes.js";
 import { buildFlow, parsePeriod, periodWindow } from "./flow.js";
 import { fetchRepoSnapshot, MetricsCache } from "./metrics.js";
+import { computeDeploymentFrequency } from "./metrics/deploymentFrequency.js";
 import { computeLeadTime } from "./metrics/leadTime.js";
 import { computeLoopTrends } from "./metrics/loopTrends.js";
+import { forge } from "./forge.js";
 import { reposOf } from "./repos.js";
 import { listRuns } from "./runs.js";
 import { listStages } from "./stages.js";
@@ -31,9 +34,10 @@ import { serveAsset } from "./static.js";
 // local default. Binding a fixed port on a host that routes to a different one is a service
 // that builds, starts, reports healthy, and answers nothing.
 const port = Number(process.env["PORT"] ?? 8787);
-const pollSeconds = Number(process.env["POLL_SECONDS"] ?? 20);
+const pollSeconds = Number(process.env["POLL_SECONDS"] ?? 300);
 const metricsRefreshSeconds = Number(process.env["METRICS_REFRESH_SECONDS"] ?? 60);
 const metricsCache = new MetricsCache(reposOf(), fetchRepoSnapshot);
+const changeThresholds = changeThresholdsOf();
 const webRoot = process.env["WEB_ROOT"] ?? join(dirname(fileURLToPath(import.meta.url)), "..", "..", "dist");
 const repoRoot = join(dirname(fileURLToPath(import.meta.url)), "..", "..");
 // Absent where a deployment ships without .github, which is a config gap worth showing as
@@ -116,6 +120,19 @@ const server = createServer(async (request, response) => {
     response.end(JSON.stringify(flow));
     return;
   }
+  if (request.url?.startsWith("/api/changes")) {
+    const repo = new URL(request.url, "http://localhost").searchParams.get("repo") ?? "";
+    const cached = metricsCache.get(repo);
+    if (cached?.snapshot === undefined) {
+      response.writeHead(404, { "content-type": "application/json" });
+      response.end(JSON.stringify({ error: "not configured or not yet refreshed" }));
+      return;
+    }
+    const board = buildChanges(cached.snapshot, stageBranches, changeThresholds, new Date());
+    response.writeHead(200, { "content-type": "application/json" });
+    response.end(JSON.stringify(board));
+    return;
+  }
   if (request.url?.startsWith("/api/lead-time")) {
     const params = new URL(request.url, "http://localhost").searchParams;
     const repo = params.get("repo") ?? "";
@@ -144,6 +161,26 @@ const server = createServer(async (request, response) => {
     const loopTrends = computeLoopTrends(cached.snapshot.runs, from, to);
     response.writeHead(200, { "content-type": "application/json" });
     response.end(JSON.stringify(loopTrends));
+    return;
+  }
+  if (request.url?.startsWith("/api/deployment-frequency")) {
+    const params = new URL(request.url, "http://localhost").searchParams;
+    const repo = params.get("repo") ?? "";
+    const cached = metricsCache.get(repo);
+    if (cached?.snapshot === undefined) {
+      response.writeHead(404, { "content-type": "application/json" });
+      response.end(JSON.stringify({ error: "not configured or not yet refreshed" }));
+      return;
+    }
+    const { from, to } = periodWindow(parsePeriod(params.get("period")), new Date());
+    const deploymentFrequency = computeDeploymentFrequency(cached.snapshot.issues, cached.snapshot.issueTimelines, from, to);
+    response.writeHead(200, { "content-type": "application/json" });
+    response.end(JSON.stringify(deploymentFrequency));
+    return;
+  }
+  if (request.url === "/api/rate-limit") {
+    response.writeHead(200, { "content-type": "application/json" });
+    response.end(JSON.stringify(forge.status()));
     return;
   }
   if (request.url === "/api/health") {

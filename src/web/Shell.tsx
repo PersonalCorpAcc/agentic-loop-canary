@@ -22,6 +22,7 @@ const NAV_ENTRIES: readonly NavEntry[] = [
   { label: "Overview", path: "/" },
   { label: "Delivery", path: "/delivery" },
   { label: "Loop", path: "/loop" },
+  { label: "Changes", path: "/changes" },
   { label: "Log", path: "/log" },
 ];
 
@@ -75,14 +76,36 @@ function NavRail(): ReactElement {
   );
 }
 
+interface RateLimitStatus {
+  readonly paused: boolean;
+  readonly pausedUntil: string | null;
+}
+
+/** How often the top bar checks whether polling has paused for the rate limit (#207) -- the
+ *  banner only needs to track a pause that lasts minutes, not seconds. */
+const RATE_LIMIT_POLL_MS = 30_000;
+
 function TopBar(): ReactElement {
   const [repo, setRepo] = useState<RepoRef | null | undefined>(undefined);
+  const [rateLimit, setRateLimit] = useState<RateLimitStatus | undefined>(undefined);
 
   useEffect(() => {
     fetch("/api/repo")
       .then((response) => response.json() as Promise<RepoRef>)
       .then(setRepo)
       .catch(() => setRepo(null));
+  }, []);
+
+  useEffect(() => {
+    const poll = () => {
+      fetch("/api/rate-limit")
+        .then((response) => response.json() as Promise<RateLimitStatus>)
+        .then(setRateLimit)
+        .catch(() => {});
+    };
+    poll();
+    const interval = setInterval(poll, RATE_LIMIT_POLL_MS);
+    return () => clearInterval(interval);
   }, []);
 
   return (
@@ -97,12 +120,25 @@ function TopBar(): ReactElement {
         borderBottom: `1px solid ${theme.palette.divider}`,
       })}
     >
-      <Typography variant="body2" sx={(theme) => ({ color: theme.palette.text.secondary })}>
-        {repo === undefined ? "" : repo === null ? "repository unavailable" : `${repo.owner}/${repo.name}`}
-      </Typography>
+      <Stack direction="row" alignItems="center" spacing={2}>
+        <Typography variant="body2" sx={(theme) => ({ color: theme.palette.text.secondary })}>
+          {repo === undefined ? "" : repo === null ? "repository unavailable" : `${repo.owner}/${repo.name}`}
+        </Typography>
+        {rateLimit?.paused === true && rateLimit.pausedUntil !== null && (
+          <Typography variant="body2" sx={(theme) => ({ color: theme.palette.text.disabled })}>
+            data paused until {formatPausedUntil(rateLimit.pausedUntil)}
+          </Typography>
+        )}
+      </Stack>
       <PeriodSelector />
     </Stack>
   );
+}
+
+/** `HH:MM` in the viewer's own local time, out of the ISO timestamp `/api/rate-limit` reports. */
+function formatPausedUntil(iso: string): string {
+  const date = new Date(iso);
+  return date.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
 }
 
 function PeriodSelector(): ReactElement {
