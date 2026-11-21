@@ -7,9 +7,9 @@ import { needsAttention } from "../../shared/types.js";
 import { formatCountdown, liveRemainingSeconds } from "../pipeline.js";
 
 /**
- * What the loop is doing, now — retired from the root route behind `/loop`
- * by #142, which gave the app a routed shell; #139's other children design
- * whatever eventually replaces it.
+ * What the loop is doing, now — retired from the root route behind `/log`
+ * by #142, which gave the app a routed shell; #149 added `/loop`'s day-by-day
+ * trend panels alongside it rather than in its place.
  *
  * The ordering rule is the whole design: anything that asked for a person comes first, then
  * whatever is still running, then history. A dashboard that sorts by time alone buries the

@@ -21,13 +21,15 @@ interface NavEntry {
 const NAV_ENTRIES: readonly NavEntry[] = [
   { label: "Overview", path: "/" },
   { label: "Delivery", path: "/delivery" },
+  { label: "Loop", path: "/loop" },
   { label: "Changes", path: "/changes" },
   { label: "Log", path: "/log" },
 ];
 
 /** The dashboard shell (#142): a dark nav rail on the left, a top bar (watched repository +
  *  period selector) above the routed page, built once so every child route — Overview,
- *  Delivery, the retired log view at `/loop` — shares the same chrome. */
+ *  Delivery, the activity-trends page at `/loop` (#149), the live run log at `/log` — shares
+ *  the same chrome. */
 export function Shell(): ReactElement {
   return (
     <Stack direction="row" sx={{ height: "100vh", minHeight: 0 }}>
