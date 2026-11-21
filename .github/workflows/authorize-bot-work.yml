@@ -17,7 +17,7 @@ permissions:
 
 jobs:
   # A work label on a closed issue starts nothing: the router does not work on closed issues.
-  # Authorising it anyway left `bot-working` on loopscope #162 for four hours with nothing
+  # Authorising it anyway left the working label on loopscope #162 for four hours with nothing
   # running (21/11/2026). Say so instead, once, to the person who labelled it. The plain
   # workflow token raises no event, so the comment cannot start a run of its own.
   closed-issue:
