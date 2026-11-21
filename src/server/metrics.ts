@@ -118,7 +118,7 @@ async function outcomeLineOf(repo: string, runId: number): Promise<OutcomeLine |
  *  (#207). A run still in progress is never cached: its own log is not final yet. */
 const completedOutcomeCache = new Map<string, OutcomeLine | undefined>();
 
-async function runsWithOutcome(repo: string): Promise<LoopRun[]> {
+export async function runsWithOutcome(repo: string): Promise<LoopRun[]> {
   const runs = await listRuns(50, repo);
   return Promise.all(runs.map(async (run) => {
     const completed = run.finishedAt !== undefined;
