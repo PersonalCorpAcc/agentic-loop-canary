@@ -6,8 +6,10 @@ import { PageHeader, Section } from "@/components/layout";
 import { TimeInStageBar, WaitingOnPersonList } from "@/components/domain";
 import { TrendChart } from "@/components/data-display";
 import { DataTable } from "@/components/data-display/DataTable";
+import { HelperText } from "@/components/primitives";
 
 import type { FlowResult } from "../../server/flow.js";
+import type { DeploymentFrequencyEntry, DeploymentFrequencyResult } from "../../server/metrics/deploymentFrequency.js";
 import type { LeadTimeEntry, LeadTimeResult } from "../../server/metrics/leadTime.js";
 import type { RepoRef } from "../../shared/repo.js";
 import { formatLeadTimeDays } from "../leadTime.js";
@@ -15,14 +17,19 @@ import { shippedInPeriod, timeInStageRows } from "../timeInStageBar.js";
 import { waitingRows } from "../waitingOnPerson.js";
 
 /** `/delivery` page (#165): "where time goes" (a stacked bar per shipped item, or an averaged
- *  one), "who do I need to go ask" (the waiting-on-a-person list), and "lead time" (#144, a
- *  trend chart + table of implement-to-merged-main durations), all built off the same cached
- *  `/api/flow`/`/api/lead-time` snapshots the Overview page's CFD/stat tile also read. */
+ *  one), "who do I need to go ask" (the waiting-on-a-person list), "lead time" (#144, a
+ *  trend chart + table of implement-to-merged-main durations), and "deployment frequency"
+ *  (#143, a trend chart + table of changes merged to `main`), all built off the same cached
+ *  `/api/flow`/`/api/lead-time`/`/api/deployment-frequency` snapshots the Overview page's
+ *  CFD/stat tiles also read. */
 export function Delivery(): ReactElement {
   const [searchParams] = useSearchParams();
   const [repo, setRepo] = useState<RepoRef | null | undefined>(undefined);
   const [flow, setFlow] = useState<FlowResult | null | undefined>(undefined);
   const [leadTime, setLeadTime] = useState<LeadTimeResult | null | undefined>(undefined);
+  const [deploymentFrequency, setDeploymentFrequency] = useState<DeploymentFrequencyResult | null | undefined>(
+    undefined,
+  );
 
   useEffect(() => {
     fetch("/api/repo")
@@ -49,6 +56,16 @@ export function Delivery(): ReactElement {
       .then((response) => (response.ok ? (response.json() as Promise<LeadTimeResult>) : null))
       .then(setLeadTime)
       .catch(() => setLeadTime(null));
+  }, [repo, searchParams]);
+
+  useEffect(() => {
+    if (repo === undefined || repo === null) return;
+    const period = searchParams.get("period") ?? "";
+    const params = new URLSearchParams({ repo: `${repo.owner}/${repo.name}`, period });
+    fetch(`/api/deployment-frequency?${params.toString()}`)
+      .then((response) => (response.ok ? (response.json() as Promise<DeploymentFrequencyResult>) : null))
+      .then(setDeploymentFrequency)
+      .catch(() => setDeploymentFrequency(null));
   }, [repo, searchParams]);
 
   return (
@@ -97,6 +114,40 @@ export function Delivery(): ReactElement {
                   ]}
                 />
               </Stack>
+            </Section>
+          ) : null}
+          {deploymentFrequency ? (
+            <Section title="Deployment frequency">
+              {deploymentFrequency.total === 0 ? (
+                <HelperText>No changes merged in this period</HelperText>
+              ) : (
+                <Stack spacing={2}>
+                  <TrendChart
+                    points={deploymentFrequency.buckets.map((b) => ({ date: b.date, value: b.count }))}
+                  />
+                  <DataTable<DeploymentFrequencyEntry>
+                    rows={deploymentFrequency.entries}
+                    getRowId={(entry) => String(entry.issue)}
+                    columns={[
+                      {
+                        id: "issue",
+                        header: "Issue",
+                        render: (entry) => (
+                          <a href={entry.url}>
+                            #{entry.issue} {entry.title}
+                          </a>
+                        ),
+                      },
+                      {
+                        id: "mergedAt",
+                        header: "Merged",
+                        value: (entry) => entry.mergedAt,
+                        render: (entry) => entry.mergedAt.slice(0, 10),
+                      },
+                    ]}
+                  />
+                </Stack>
+              )}
             </Section>
           ) : null}
         </Stack>

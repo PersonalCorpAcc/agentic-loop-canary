@@ -7,6 +7,7 @@ import type { LoopEvent, LoopRun, Stage } from "../shared/types.js";
 import { parseRepo } from "../shared/repo.js";
 import { buildFlow, parsePeriod, periodWindow } from "./flow.js";
 import { fetchRepoSnapshot, MetricsCache } from "./metrics.js";
+import { computeDeploymentFrequency } from "./metrics/deploymentFrequency.js";
 import { computeLeadTime } from "./metrics/leadTime.js";
 import { reposOf } from "./repos.js";
 import { listRuns } from "./runs.js";
@@ -128,6 +129,21 @@ const server = createServer(async (request, response) => {
     const leadTime = computeLeadTime(cached.snapshot.issues, cached.snapshot.issueTimelines, from, to);
     response.writeHead(200, { "content-type": "application/json" });
     response.end(JSON.stringify(leadTime));
+    return;
+  }
+  if (request.url?.startsWith("/api/deployment-frequency")) {
+    const params = new URL(request.url, "http://localhost").searchParams;
+    const repo = params.get("repo") ?? "";
+    const cached = metricsCache.get(repo);
+    if (cached?.snapshot === undefined) {
+      response.writeHead(404, { "content-type": "application/json" });
+      response.end(JSON.stringify({ error: "not configured or not yet refreshed" }));
+      return;
+    }
+    const { from, to } = periodWindow(parsePeriod(params.get("period")), new Date());
+    const deploymentFrequency = computeDeploymentFrequency(cached.snapshot.issues, cached.snapshot.issueTimelines, from, to);
+    response.writeHead(200, { "content-type": "application/json" });
+    response.end(JSON.stringify(deploymentFrequency));
     return;
   }
   if (request.url === "/api/health") {
