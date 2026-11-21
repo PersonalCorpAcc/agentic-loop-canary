@@ -7,8 +7,10 @@ import { HelperText, StatTile } from "@/components/primitives";
 import type { DeploymentFrequencyResult } from "../../server/metrics/deploymentFrequency.js";
 import type { LeadTimeResult } from "../../server/metrics/leadTime.js";
 import type { RepoRef } from "../../shared/repo.js";
+import { formatChangeFailureRateDelta, formatChangeFailureRatePercent, type ChangeFailureRateApiResult } from "../changeFailureRate.js";
 import { formatDeploymentFrequencyDelta } from "../deploymentFrequency.js";
 import { formatLeadTimeDays } from "../leadTime.js";
+import { formatTimeToRestoreDays, formatTimeToRestoreDelta, type TimeToRestoreApiResult } from "../timeToRestore.js";
 
 /** Root page (`/`). Lead-time (#144) and deployment-frequency (#143) stat tiles -- #139's
  *  remaining children will add more summary tiles alongside them. */
@@ -18,6 +20,8 @@ export function Overview(): ReactElement {
   const [deploymentFrequency, setDeploymentFrequency] = useState<DeploymentFrequencyResult | null | undefined>(
     undefined,
   );
+  const [changeFailureRate, setChangeFailureRate] = useState<ChangeFailureRateApiResult | null | undefined>(undefined);
+  const [timeToRestore, setTimeToRestore] = useState<TimeToRestoreApiResult | null | undefined>(undefined);
 
   useEffect(() => {
     fetch("/api/repo")
@@ -42,6 +46,24 @@ export function Overview(): ReactElement {
       .then((response) => (response.ok ? (response.json() as Promise<DeploymentFrequencyResult>) : null))
       .then(setDeploymentFrequency)
       .catch(() => setDeploymentFrequency(null));
+  }, [repo]);
+
+  useEffect(() => {
+    if (repo === undefined || repo === null) return;
+    const params = new URLSearchParams({ repo: `${repo.owner}/${repo.name}`, period: "" });
+    fetch(`/api/change-failure-rate?${params.toString()}`)
+      .then((response) => (response.ok ? (response.json() as Promise<ChangeFailureRateApiResult>) : null))
+      .then(setChangeFailureRate)
+      .catch(() => setChangeFailureRate(null));
+  }, [repo]);
+
+  useEffect(() => {
+    if (repo === undefined || repo === null) return;
+    const params = new URLSearchParams({ repo: `${repo.owner}/${repo.name}`, period: "" });
+    fetch(`/api/time-to-restore?${params.toString()}`)
+      .then((response) => (response.ok ? (response.json() as Promise<TimeToRestoreApiResult>) : null))
+      .then(setTimeToRestore)
+      .catch(() => setTimeToRestore(null));
   }, [repo]);
 
   return (
@@ -69,6 +91,56 @@ export function Overview(): ReactElement {
                   <Sparkline points={deploymentFrequency.buckets.map((b) => b.count)} />
                   <HelperText inline>
                     {formatDeploymentFrequencyDelta(deploymentFrequency.total, deploymentFrequency.previousTotal)}
+                  </HelperText>
+                </>
+              )
+            }
+          />
+        </Section>
+      ) : null}
+      {changeFailureRate ? (
+        <Section title="Change failure rate">
+          <StatTile
+            label="Change failure rate"
+            value={formatChangeFailureRatePercent(changeFailureRate.rate)}
+            sub={
+              changeFailureRate.shipped === 0 ? (
+                <HelperText inline>No changes shipped in this period</HelperText>
+              ) : (
+                <>
+                  <Sparkline points={changeFailureRate.buckets.map((b) => b.rate)} />
+                  <HelperText inline>
+                    {formatChangeFailureRateDelta(
+                      changeFailureRate.shipped,
+                      changeFailureRate.previousShipped,
+                      changeFailureRate.rate,
+                      changeFailureRate.previousRate,
+                    )}
+                  </HelperText>
+                </>
+              )
+            }
+          />
+        </Section>
+      ) : null}
+      {timeToRestore ? (
+        <Section title="Time to restore">
+          <StatTile
+            label="Time to restore"
+            value={formatTimeToRestoreDays(timeToRestore.averageDays)}
+            sub={
+              timeToRestore.sampleCount === 0 ? (
+                <HelperText inline>No incidents resolved in this period</HelperText>
+              ) : (
+                <>
+                  <Sparkline points={timeToRestore.buckets.map((b) => b.averageDays)} />
+                  <HelperText inline>
+                    {formatTimeToRestoreDelta(
+                      timeToRestore.sampleCount,
+                      timeToRestore.previousSampleCount,
+                      timeToRestore.averageDays,
+                      timeToRestore.previousAverageDays,
+                    )}
                   </HelperText>
                 </>
               )

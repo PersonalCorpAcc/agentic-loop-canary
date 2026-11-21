@@ -9,6 +9,7 @@ import { carriesHotfix, INCIDENT_LABELS, type IssueTimeline } from "./timeline.j
  */
 
 const MS_PER_DAY = 86_400_000;
+const WEEKLY_THRESHOLD_DAYS = 30;
 
 export interface RestoreSample {
   readonly issue: number;
@@ -21,6 +22,12 @@ export interface RestoreSample {
 export interface TimeToRestoreResult {
   readonly samples: readonly RestoreSample[];
   readonly averageDays: number;
+}
+
+export interface TimeToRestoreBucket {
+  readonly date: string;
+  readonly averageDays: number;
+  readonly count: number;
 }
 
 const INCIDENT_LABEL_NAMES: readonly string[] = INCIDENT_LABELS;
@@ -74,4 +81,78 @@ export function computeTimeToRestore(
 
   const averageDays = samples.length === 0 ? 0 : samples.reduce((sum, sample) => sum + sample.days, 0) / samples.length;
   return { samples, averageDays };
+}
+
+function utcDay(date: Date): Date {
+  return new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate()));
+}
+
+/** Monday-anchored UTC week start -- the same convention `deploymentFrequency.ts`/
+ *  `changeFailureRate.ts` use, so a bucket label never depends on where `from` falls
+ *  mid-week. */
+function utcWeekStart(date: Date): Date {
+  const day = utcDay(date);
+  const isoDayOfWeek = (day.getUTCDay() + 6) % 7; // Monday = 0 .. Sunday = 6
+  day.setUTCDate(day.getUTCDate() - isoDayOfWeek);
+  return day;
+}
+
+function toDateKey(date: Date): string {
+  return date.toISOString().slice(0, 10);
+}
+
+function granularityOf(from: Date, to: Date): "day" | "week" {
+  const spanDays = (to.getTime() - from.getTime()) / MS_PER_DAY;
+  return spanDays > WEEKLY_THRESHOLD_DAYS ? "week" : "day";
+}
+
+function bucketKeyOf(at: string, granularity: "day" | "week"): string {
+  const date = new Date(at);
+  return granularity === "week" ? toDateKey(utcWeekStart(date)) : toDateKey(utcDay(date));
+}
+
+function emptyBuckets(from: Date, to: Date, granularity: "day" | "week"): Map<string, { total: number; count: number }> {
+  const buckets = new Map<string, { total: number; count: number }>();
+  const step = granularity === "week" ? 7 : 1;
+  const cursor = granularity === "week" ? utcWeekStart(from) : utcDay(from);
+  const end = granularity === "week" ? utcWeekStart(to) : utcDay(to);
+  while (cursor.getTime() <= end.getTime()) {
+    buckets.set(toDateKey(cursor), { total: 0, count: 0 });
+    cursor.setUTCDate(cursor.getUTCDate() + step);
+  }
+  return buckets;
+}
+
+/** One `{date, averageDays, count}` bucket per calendar day/week in `[from, to]`, every one
+ *  present (never an absent key), bucketed by each sample's *clearing* date -- matching
+ *  {@link computeTimeToRestore}'s own window filter. `averageDays` is `0` rather than `NaN`
+ *  on a bucket nothing cleared in. */
+export function timeToRestoreBuckets(
+  timelines: readonly IssueTimeline[],
+  from: Date,
+  to: Date,
+): { buckets: TimeToRestoreBucket[]; granularity: "day" | "week" } {
+  const granularity = granularityOf(from, to);
+  const totals = emptyBuckets(from, to, granularity);
+  const fromMs = from.getTime();
+  const toMs = to.getTime();
+
+  const samples = timelines.filter((timeline) => !carriesHotfix(timeline)).flatMap((timeline) => restoreSamplesFor(timeline));
+
+  for (const sample of samples) {
+    const closedAt = new Date(sample.closedAt).getTime();
+    if (closedAt < fromMs || closedAt > toMs) continue;
+
+    const key = bucketKeyOf(sample.closedAt, granularity);
+    const bucket = totals.get(key);
+    if (bucket === undefined) continue;
+    bucket.total += sample.days;
+    bucket.count += 1;
+  }
+
+  const buckets = [...totals]
+    .sort(([a], [b]) => a.localeCompare(b))
+    .map(([date, { total, count }]) => ({ date, averageDays: count === 0 ? 0 : total / count, count }));
+
+  return { buckets, granularity };
 }

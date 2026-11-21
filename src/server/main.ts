@@ -7,8 +7,11 @@ import type { LoopEvent, LoopRun, Stage } from "../shared/types.js";
 import { parseRepo } from "../shared/repo.js";
 import { buildFlow, parsePeriod, periodWindow } from "./flow.js";
 import { fetchRepoSnapshot, MetricsCache } from "./metrics.js";
+import { changeFailureEntries, changeFailureRateBuckets, computeChangeFailureRate } from "./metrics/changeFailureRate.js";
 import { computeDeploymentFrequency } from "./metrics/deploymentFrequency.js";
 import { computeLeadTime } from "./metrics/leadTime.js";
+import { timelinesOf } from "./metrics/timeline.js";
+import { computeTimeToRestore, timeToRestoreBuckets } from "./metrics/timeToRestore.js";
 import { forge } from "./forge.js";
 import { reposOf } from "./repos.js";
 import { listRuns } from "./runs.js";
@@ -145,6 +148,68 @@ const server = createServer(async (request, response) => {
     const deploymentFrequency = computeDeploymentFrequency(cached.snapshot.issues, cached.snapshot.issueTimelines, from, to);
     response.writeHead(200, { "content-type": "application/json" });
     response.end(JSON.stringify(deploymentFrequency));
+    return;
+  }
+  if (request.url?.startsWith("/api/change-failure-rate")) {
+    const params = new URL(request.url, "http://localhost").searchParams;
+    const repo = params.get("repo") ?? "";
+    const cached = metricsCache.get(repo);
+    if (cached?.snapshot === undefined) {
+      response.writeHead(404, { "content-type": "application/json" });
+      response.end(JSON.stringify({ error: "not configured or not yet refreshed" }));
+      return;
+    }
+    const { from, to } = periodWindow(parsePeriod(params.get("period")), new Date());
+    const previousFrom = new Date(from.getTime() - (to.getTime() - from.getTime()));
+    const timelines = timelinesOf(cached.snapshot.issues, cached.snapshot.issueTimelines);
+    const current = computeChangeFailureRate(timelines, "merged-main", from, to);
+    const previous = computeChangeFailureRate(timelines, "merged-main", previousFrom, from);
+    const { buckets, granularity } = changeFailureRateBuckets(timelines, "merged-main", from, to);
+    const { buckets: previousBuckets } = changeFailureRateBuckets(timelines, "merged-main", previousFrom, from);
+    const entries = changeFailureEntries(current.failed, cached.snapshot.issues, timelines, cached.snapshot.pullRequests);
+    response.writeHead(200, { "content-type": "application/json" });
+    response.end(
+      JSON.stringify({
+        shipped: current.shipped,
+        rate: current.rate,
+        previousShipped: previous.shipped,
+        previousRate: previous.rate,
+        buckets,
+        previousBuckets,
+        granularity,
+        entries,
+      }),
+    );
+    return;
+  }
+  if (request.url?.startsWith("/api/time-to-restore")) {
+    const params = new URL(request.url, "http://localhost").searchParams;
+    const repo = params.get("repo") ?? "";
+    const cached = metricsCache.get(repo);
+    if (cached?.snapshot === undefined) {
+      response.writeHead(404, { "content-type": "application/json" });
+      response.end(JSON.stringify({ error: "not configured or not yet refreshed" }));
+      return;
+    }
+    const { from, to } = periodWindow(parsePeriod(params.get("period")), new Date());
+    const previousFrom = new Date(from.getTime() - (to.getTime() - from.getTime()));
+    const timelines = timelinesOf(cached.snapshot.issues, cached.snapshot.issueTimelines);
+    const current = computeTimeToRestore(timelines, from, to);
+    const previous = computeTimeToRestore(timelines, previousFrom, from);
+    const { buckets, granularity } = timeToRestoreBuckets(timelines, from, to);
+    const { buckets: previousBuckets } = timeToRestoreBuckets(timelines, previousFrom, from);
+    response.writeHead(200, { "content-type": "application/json" });
+    response.end(
+      JSON.stringify({
+        averageDays: current.averageDays,
+        sampleCount: current.samples.length,
+        previousAverageDays: previous.averageDays,
+        previousSampleCount: previous.samples.length,
+        buckets,
+        previousBuckets,
+        granularity,
+      }),
+    );
     return;
   }
   if (request.url === "/api/rate-limit") {

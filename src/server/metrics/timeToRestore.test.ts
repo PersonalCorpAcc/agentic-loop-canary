@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { computeTimeToRestore } from "./timeToRestore.js";
+import { computeTimeToRestore, timeToRestoreBuckets } from "./timeToRestore.js";
 import type { IssueTimeline } from "./timeline.js";
 
 /**
@@ -92,5 +92,53 @@ describe("computeTimeToRestore", () => {
       ],
     };
     expect(computeTimeToRestore([timeline], SINCE, UNTIL)).toEqual({ samples: [], averageDays: 0 });
+  });
+});
+
+describe("timeToRestoreBuckets", () => {
+  it("buckets daily for a 30-day span and weekly for a 91-day span, by the clearing date", () => {
+    const timeline: IssueTimeline = {
+      issue: 501,
+      events: [
+        { event: "labeled", created_at: "2026-01-08T00:00:00Z", label: { name: "hold" } },
+        { event: "unlabeled", created_at: "2026-01-10T00:00:00Z", label: { name: "hold" } },
+      ],
+    };
+
+    const daily = timeToRestoreBuckets([timeline], new Date("2026-01-01T00:00:00Z"), new Date("2026-01-31T00:00:00Z"));
+    expect(daily.granularity).toBe("day");
+    expect(daily.buckets).toHaveLength(31);
+    expect(daily.buckets.find((b) => b.date === "2026-01-10")).toEqual({ date: "2026-01-10", averageDays: 2, count: 1 });
+
+    const weekly = timeToRestoreBuckets([timeline], new Date("2026-01-01T00:00:00Z"), new Date("2026-04-01T00:00:00Z"));
+    expect(weekly.granularity).toBe("week");
+    expect(weekly.buckets[0]?.date).toBe("2025-12-29");
+  });
+
+  it("averages multiple samples that clear in the same bucket", () => {
+    const timelines: IssueTimeline[] = [
+      {
+        issue: 502,
+        events: [
+          { event: "labeled", created_at: "2026-01-10T00:00:00Z", label: { name: "hold" } },
+          { event: "unlabeled", created_at: "2026-01-11T00:00:00Z", label: { name: "hold" } },
+        ],
+      },
+      {
+        issue: 503,
+        events: [
+          { event: "labeled", created_at: "2026-01-07T00:00:00Z", label: { name: "rollback" } },
+          { event: "unlabeled", created_at: "2026-01-11T00:00:00Z", label: { name: "rollback" } },
+        ],
+      },
+    ];
+    const result = timeToRestoreBuckets(timelines, new Date("2026-01-01T00:00:00Z"), new Date("2026-01-31T00:00:00Z"));
+    expect(result.buckets.find((b) => b.date === "2026-01-11")).toEqual({ date: "2026-01-11", averageDays: 2.5, count: 2 });
+  });
+
+  it("reports averageDays 0 with all-zero buckets still present when nothing cleared", () => {
+    const result = timeToRestoreBuckets([], new Date("2026-01-01T00:00:00Z"), new Date("2026-01-05T00:00:00Z"));
+    expect(result.buckets.length).toBeGreaterThan(0);
+    expect(result.buckets.every((b) => b.averageDays === 0 && b.count === 0)).toBe(true);
   });
 });
