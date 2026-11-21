@@ -1,4 +1,4 @@
-import type { Stage, StageBlock } from "../shared/types.js";
+import type { Stage, StageBlock, StageSoak } from "../shared/types.js";
 import { reposOf } from "./repos.js";
 import { carriedIssuesOf } from "./runs.js";
 
@@ -86,14 +86,40 @@ function issueUrl(issue: number): string {
   return `https://github.com/${repo}/issues/${issue}`;
 }
 
-/** Every issue stopping a promotion out of `previous` into `next`, oldest first. Empty
- *  when `previous` has nothing to carry, or its snapshot already landed on `next`. */
-async function blockedIssuesOf(previous: string, next: string): Promise<StageBlock[]> {
+/** When the pull request that produced `sha` merged, the same way `promote-change.sh`'s
+ *  `promote_by_snapshot` times a soak -- against the merge, not the commit's own date, since
+ *  a cherry-pick or rebase can carry an older commit date forward. `undefined` when no merged
+ *  pull request is on record for it. */
+async function mergedAtOf(sha: string): Promise<string | undefined> {
+  const pulls = await get<Array<{ merged_at?: string | null }>>(`/commits/${sha}/pulls`);
+  return pulls?.[0]?.merged_at ?? undefined;
+}
+
+/** `max(0, floor(soakSeconds - elapsed))`, so a soak already past its duration floors to
+ *  zero rather than counting into negative time. */
+export function remainingSoakSeconds(soakSeconds: number, mergedAt: string, now: number): number {
+  const elapsedSeconds = (now - Date.parse(mergedAt)) / 1000;
+  return Math.max(0, Math.floor(soakSeconds - elapsedSeconds));
+}
+
+interface Pending {
+  /** Every issue currently merged onto the stage and not yet promoted past it. */
+  readonly items: readonly { issue: number; url: string }[];
+  /** Of those, the ones carrying a hold, rollback or hotfix label. */
+  readonly blockedBy: readonly StageBlock[];
+  /** The newest ahead commit's sha, for soak timing -- `undefined` when nothing is pending. */
+  readonly tip: string | undefined;
+}
+
+/** Everything pending a promotion out of `previous` into `next`: its items, which of them
+ *  are blocking, and the commit a soak is timed against. Empty/`undefined` when `previous`
+ *  has nothing to carry, or its snapshot already landed on `next`. */
+async function pendingOf(previous: string, next: string): Promise<Pending> {
   const commits = await commitsAhead(previous, next);
-  if (commits.length === 0) return [];
+  if (commits.length === 0) return { items: [], blockedBy: [], tip: undefined };
 
   const tip = commits[commits.length - 1]!.sha;
-  if (await alreadyPromoted(next, tip)) return [];
+  if (await alreadyPromoted(next, tip)) return { items: [], blockedBy: [], tip: undefined };
 
   const issues = new Set<number>();
   for (const commit of commits) {
@@ -101,24 +127,48 @@ async function blockedIssuesOf(previous: string, next: string): Promise<StageBlo
     if (issue !== undefined) issues.add(issue);
   }
 
-  const blocked: StageBlock[] = [];
+  const items = [...issues].map((issue) => ({ issue, url: issueUrl(issue) }));
+  const blockedBy: StageBlock[] = [];
   for (const issue of issues) {
     const label = blockingLabelOf(await labelsOf(issue));
-    if (label !== undefined) blocked.push({ issue, label, url: issueUrl(issue) });
+    if (label !== undefined) blockedBy.push({ issue, label, url: issueUrl(issue) });
   }
-  return blocked;
+  return { items, blockedBy, tip };
 }
 
-/** Every stage in the chain, in order, with whichever of them a hold, rollback or hotfix
- *  label is currently freezing. The last stage has nothing to promote out of, so it is
- *  never frozen. */
-export async function listStages(stageBranches: readonly string[]): Promise<Stage[]> {
+/** Every stage in the chain, in order: whichever of them a hold, rollback or hotfix label is
+ *  currently freezing, every issue merged onto it and waiting to promote onward, and --
+ *  where `soakSeconds` (from `soakOf`) names a duration for the next stage, the stage is not
+ *  frozen, and a merge timestamp can be read -- how long remains before its newest pending
+ *  change can promote. The last stage has nothing to promote out of, so it is never frozen
+ *  and never soaking. */
+export async function listStages(
+  stageBranches: readonly string[],
+  soakSeconds?: Record<string, number>,
+): Promise<Stage[]> {
   const stages: Stage[] = [];
   for (let index = 0; index < stageBranches.length; index += 1) {
     const name = stageBranches[index]!;
     const next = stageBranches[index + 1];
-    const blockedBy = next === undefined ? [] : await blockedIssuesOf(name, next);
-    stages.push({ name, frozen: blockedBy.length > 0, blockedBy });
+    if (next === undefined) {
+      stages.push({ name, frozen: false, blockedBy: [], items: [] });
+      continue;
+    }
+
+    const { items, blockedBy, tip } = await pendingOf(name, next);
+    const frozen = blockedBy.length > 0;
+
+    let soak: StageSoak | undefined;
+    const duration = soakSeconds?.[next];
+    if (!frozen && tip !== undefined && duration !== undefined) {
+      const mergedAt = await mergedAtOf(tip);
+      if (mergedAt !== undefined) {
+        const remainingSeconds = remainingSoakSeconds(duration, mergedAt, Date.now());
+        soak = { remainingSeconds, completesAt: new Date(Date.now() + remainingSeconds * 1000).toISOString() };
+      }
+    }
+
+    stages.push({ name, frozen, blockedBy, items, ...(soak === undefined ? {} : { soak }) });
   }
   return stages;
 }
