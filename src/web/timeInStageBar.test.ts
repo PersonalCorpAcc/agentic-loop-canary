@@ -26,6 +26,7 @@ function item(partial: Partial<FlowItem> & Pick<FlowItem, "issue">): FlowItem {
     held: false,
     history: [{ stage: "shipped", enteredAt: "2026-01-05T00:00:00Z" }],
     durationsMs: zeroDurations(),
+    createdAt: "2025-12-01T00:00:00Z",
     ...partial,
   };
 }
